@@ -1,0 +1,1744 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Skat Block</title>
+  
+  <script>
+    try {
+      const theme = localStorage.getItem('skat_theme');
+      if (theme === 'dark' || theme === '"dark"') document.documentElement.classList.add('dark');
+    } catch(e) { document.documentElement.classList.add('dark'); }
+  </script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            app: {
+              base: 'rgb(var(--c-base) / <alpha-value>)',
+              panel: 'rgb(var(--c-panel) / <alpha-value>)',
+              element: 'rgb(var(--c-element) / <alpha-value>)',
+              border: 'rgb(var(--c-border) / <alpha-value>)',
+              borderstrong: 'rgb(var(--c-borderstrong) / <alpha-value>)',
+              text: 'rgb(var(--c-text) / <alpha-value>)',
+              muted: 'rgb(var(--c-muted) / <alpha-value>)',
+              faint: 'rgb(var(--c-faint) / <alpha-value>)',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- PDF Generation Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    :root {
+      --c-base: 248 250 252; --c-panel: 255 255 255; --c-element: 241 245 249;
+      --c-border: 226 232 240; --c-borderstrong: 203 213 225; --c-text: 15 23 42;
+      --c-muted: 71 85 105; --c-faint: 148 163 184;
+    }
+    html.dark {
+      --c-base: 2 6 23; --c-panel: 15 23 42; --c-element: 30 41 59;
+      --c-border: 30 41 59; --c-borderstrong: 51 65 85; --c-text: 241 245 249;
+      --c-muted: 148 163 184; --c-faint: 100 116 139;
+    }
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(245, 158, 11, 0.5); border-radius: 10px; }
+    
+    html, body {
+      background-color: rgb(var(--c-base)); color: rgb(var(--c-text));
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      overflow: hidden; overscroll-behavior: none; -webkit-tap-highlight-color: transparent;
+    }
+    #root { width: 100%; height: 100%; display: flex; justify-content: center; }
+
+    /* Print Styles: Zwingt den Browser beim nativen Drucken dazu, das gesamte Dokument auszurollen */
+    @media print {
+      html, body, #root { 
+        height: auto !important; 
+        overflow: visible !important; 
+        background-color: white !important; 
+        color: black !important; 
+        display: block !important;
+      }
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+      @page { margin: 1cm; size: A4 portrait; }
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      table { page-break-inside: auto; }
+      tr { page-break-inside: avoid; page-break-after: auto; }
+      td, th { page-break-inside: avoid; page-break-after: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    const LocalStore = {
+      get: (key) => { try { return JSON.parse(window['local' + 'Storage'].getItem(key)); } catch(e){ return null; } },
+      set: (key, val) => { try { window['local' + 'Storage'].setItem(key, JSON.stringify(val)); } catch(e){} },
+      remove: (key) => { try { window['local' + 'Storage'].removeItem(key); } catch(e){} }
+    };
+
+    // Icons
+    const SvgIcon = ({ className, children }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>);
+    const Settings = (p) => <SvgIcon {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></SvgIcon>;
+    const BarChart2 = (p) => <SvgIcon {...p}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></SvgIcon>;
+    const Edit3 = (p) => <SvgIcon {...p}><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></SvgIcon>;
+    const Trash2 = (p) => <SvgIcon {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1-2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></SvgIcon>;
+    const Plus = (p) => <SvgIcon {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></SvgIcon>;
+    const X = (p) => <SvgIcon {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></SvgIcon>;
+    const Check = (p) => <SvgIcon {...p}><polyline points="20 6 9 17 4 12"/></SvgIcon>;
+    const Award = (p) => <SvgIcon {...p}><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></SvgIcon>;
+    const MessageCircle = (p) => <SvgIcon {...p}><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></SvgIcon>;
+    const Share2 = (p) => <SvgIcon {...p}><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></SvgIcon>;
+    const Copy = (p) => <SvgIcon {...p}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></SvgIcon>;
+    const RotateCcw = (p) => <SvgIcon {...p}><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></SvgIcon>;
+    const Clock = (p) => <SvgIcon {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></SvgIcon>;
+    const Delete = (p) => <SvgIcon {...p}><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></SvgIcon>;
+    const TrendingUp = (p) => <SvgIcon {...p}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></SvgIcon>;
+    const ChevronRight = (p) => <SvgIcon {...p}><polyline points="9 18 15 12 9 6"/></SvgIcon>;
+    const ChevronUp = (p) => <SvgIcon {...p}><polyline points="18 15 12 9 6 15"/></SvgIcon>;
+    const ChevronDown = (p) => <SvgIcon {...p}><polyline points="6 9 12 15 18 9"/></SvgIcon>;
+    const Flag = (p) => <SvgIcon {...p}><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></SvgIcon>;
+    const UserPlus = (p) => <SvgIcon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></SvgIcon>;
+    const UserMinus = (p) => <SvgIcon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/></SvgIcon>;
+    const Sun = (p) => <SvgIcon {...p}><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></SvgIcon>;
+    const Moon = (p) => <SvgIcon {...p}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></SvgIcon>;
+    const Banknote = (p) => <SvgIcon {...p}><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></SvgIcon>;
+    const Zap = (p) => <SvgIcon {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></SvgIcon>;
+    const Printer = (p) => <SvgIcon {...p}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></SvgIcon>;
+    const FileText = (p) => <SvgIcon {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></SvgIcon>;
+    const Download = (p) => <SvgIcon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></SvgIcon>;
+
+    const ModernSkatLogo = ({ className }) => (
+      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+        <circle cx="50" cy="50" r="47" stroke="currentColor" strokeWidth="2.5" opacity="0.4"/>
+        <g transform="translate(6, 30.8) scale(1.6)" fill="currentColor"><path d="M12 2L2 12l10 10 10-10L12 2z"/></g>
+        <g transform="translate(30.8, 6) scale(1.6)" fill="currentColor"><path d="M12 2C10.34 2 9 3.34 9 5c0 1.13.63 2.1 1.53 2.62C8.54 7.85 7 9.54 7 11.5 7 13.71 8.79 15.5 11 15.5c.39 0 .76-.05 1.11-.16L10 21h4l-2.11-5.66c.35.11.72.16 1.11.16 2.21 0 4-1.79 4-4 0-1.96-1.46-3.65-3.47-3.88C14.37 7.1 15 6.13 15 5c0-1.66-1.34-3-3-3z"/></g>
+        <g transform="translate(30.8, 55.6) scale(1.6)" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></g>
+        <g transform="translate(55.6, 30.8) scale(1.6)" fill="currentColor"><path d="M12 2C8 7 4 11 4 15c0 2.76 2.24 5 5 5 1.5 0 2.5-.5 3-1.5v3.5h2v-3.5c.5 1 1.5 1.5 3 1.5 2.76 0 5-2.24 5-5 0-4-4-8-8-13z"/></g>
+      </svg>
+    );
+
+    const GAME_SUITS = [
+      { id: 'karo', label: '♦', base: 9, color: 'text-orange-500' },
+      { id: 'herz', label: '♥', base: 10, color: 'text-rose-500' },
+      { id: 'pik', label: '♠', base: 11, color: 'text-slate-900 dark:text-slate-200' },
+      { id: 'kreuz', label: '♣', base: 12, color: 'text-slate-900 dark:text-slate-200' },
+      { id: 'grand', label: 'G', base: 24, color: 'text-amber-600 dark:text-amber-400' },
+    ];
+    const NULL_GAMES = [
+      { id: 'null', label: 'Einfach', value: 23 },
+      { id: 'null_hand', label: 'Hand', value: 35 },
+      { id: 'null_ouvert', label: 'Ouvert', value: 46 },
+      { id: 'null_ouvert_hand', label: 'Ouvert Hand', value: 59 },
+    ];
+    const SCORING_SYSTEMS = [
+      { id: 'classic', name: 'Klassische Abrechnung', short: 'Klassisch', desc: 'Gewonnen: +Spielwert. Verloren: -2x Spielwert (für Alleinspieler).' },
+      { id: 'seeger', name: 'Seeger-Fabian-System', short: 'Turnier (Seeger)', desc: 'Gewonnen: +50 extra. Verloren: -50 für Alleinspieler, +40 für beide Gegner.' },
+      { id: 'bierlachs', name: 'Bierskat (Bierlachs)', short: 'Bierlachs', desc: 'Gegenspieler bekommen Minuspunkte, Alleinspieler nie.' }
+    ];
+
+    function SetupScreen({ players, setPlayers, gameDate, setGameDate, scoringSystem, setScoringSystem, seriesLimit, setSeriesLimit, eventMeta, setEventMeta, onStart, onOpenHistory, theme, setTheme }) {
+      const updatePlayer = (index, value) => {
+        const newPlayers = [...players];
+        newPlayers[index] = value;
+        setPlayers(newPlayers);
+      };
+
+      const [showMore, setShowMore] = useState(false);
+
+      return (
+        <div className="h-full w-full bg-app-base text-app-text font-sans flex flex-col sm:justify-center sm:p-4 relative">
+          <div className="w-full h-full sm:h-auto max-w-md mx-auto bg-app-panel sm:rounded-3xl border-0 sm:border border-app-border sm:shadow-2xl overflow-hidden flex flex-col sm:max-h-[95vh] relative">
+            
+            <button type="button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="absolute top-4 left-4 p-2 text-app-muted hover:text-amber-500 hover:bg-app-element rounded-full transition-colors z-10">
+              {theme === 'dark' ? <Moon className="w-6 h-6" /> : <Sun className="w-6 h-6 text-amber-500" />}
+            </button>
+
+            <button type="button" onClick={onOpenHistory} className="absolute top-4 right-4 p-2 text-app-muted hover:text-amber-400 hover:bg-app-element rounded-full transition-colors z-10"><Clock className="w-6 h-6" /></button>
+
+            <div className="text-center space-y-2 pt-8 pb-4 shrink-0">
+              <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/20 mb-2">
+                <ModernSkatLogo className="w-14 h-14 text-slate-950" />
+              </div>
+              <h1 className="text-2xl font-black tracking-tight bg-gradient-to-r from-app-text to-app-muted bg-clip-text text-transparent">Skat Block</h1>
+            </div>
+
+            <div className="overflow-y-auto px-5 pb-5 space-y-6 flex-1 custom-scrollbar">
+              <form id="setup-form" onSubmit={(e) => { e.preventDefault(); onStart(); }} className="space-y-6">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-[11px] font-bold text-app-muted uppercase tracking-wider">Tischrunde ({players.length} Spieler)</h2>
+                    {players.length === 3 ? (
+                      <button type="button" onClick={() => setPlayers([...players, `Spieler 4`])} className="text-xs font-bold text-amber-500 flex items-center gap-1 bg-amber-500/10 px-2 py-1 rounded-md"><UserPlus className="w-3.5 h-3.5"/> 4. Spieler</button>
+                    ) : (
+                      <button type="button" onClick={() => setPlayers(players.slice(0, 3))} className="text-xs font-bold text-rose-400 flex items-center gap-1 bg-rose-500/10 px-2 py-1 rounded-md"><UserMinus className="w-3.5 h-3.5"/> Auf 3 reduzieren</button>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <input type="date" value={gameDate} onChange={(e) => setGameDate(e.target.value)} className="w-full block box-border bg-app-base border border-app-border rounded-xl px-4 h-[48px] text-app-text focus:outline-none focus:border-amber-500 text-base appearance-none m-0 transition-colors" required />
+                    {players.map((p, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <input type="text" value={p} onChange={(e) => updatePlayer(i, e.target.value)} placeholder={`Name Spieler ${i + 1}`} className="w-full block box-border bg-app-base border border-app-border rounded-xl px-4 h-[48px] text-app-text focus:outline-none focus:border-amber-500 text-base appearance-none m-0 transition-colors" required />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h2 className="text-[11px] font-bold text-app-muted uppercase tracking-wider">Serienlänge (Turnier-Modus)</h2>
+                  <div className="flex gap-2">
+                    {[0, 24, 36, 48].map(limit => (
+                      <button key={limit} type="button" onClick={() => setSeriesLimit(limit)} className={`flex-1 py-2.5 rounded-xl border text-sm font-bold transition-colors ${seriesLimit === limit ? 'bg-amber-500/20 text-amber-500 border-amber-500/50 shadow-sm' : 'bg-app-base/50 text-app-faint border-app-border hover:border-app-borderstrong'}`}>
+                        {limit === 0 ? 'Endlos' : limit}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3 pb-2">
+                  <div className="flex justify-between items-center cursor-pointer" onClick={() => setShowMore(!showMore)}>
+                    <h2 className="text-[11px] font-bold text-app-muted uppercase tracking-wider">Turnier-Details (Protokoll)</h2>
+                    <ChevronRight className={`w-4 h-4 text-app-muted transition-transform ${showMore ? 'rotate-90' : ''}`} />
+                  </div>
+                  {showMore && (
+                    <div className="space-y-2 pt-1 animate-in fade-in slide-in-from-top-2">
+                      <input type="text" value={eventMeta.eventName} onChange={(e) => setEventMeta({...eventMeta, eventName: e.target.value})} placeholder="Event / Turnier (Optional)" className="w-full block box-border bg-app-base border border-app-border rounded-xl px-4 h-[44px] text-sm text-app-text focus:outline-none focus:border-amber-500 appearance-none m-0 transition-colors" />
+                      <div className="flex gap-2">
+                         <input type="text" value={eventMeta.tableNumber} onChange={(e) => setEventMeta({...eventMeta, tableNumber: e.target.value})} placeholder="Tisch-Nr." className="w-full block box-border bg-app-base border border-app-border rounded-xl px-4 h-[44px] text-sm text-app-text focus:outline-none focus:border-amber-500 appearance-none m-0 transition-colors" />
+                         <input type="text" value={eventMeta.seriesNumber} onChange={(e) => setEventMeta({...eventMeta, seriesNumber: e.target.value})} placeholder="Serien-Nr." className="w-full block box-border bg-app-base border border-app-border rounded-xl px-4 h-[44px] text-sm text-app-text focus:outline-none focus:border-amber-500 appearance-none m-0 transition-colors" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3 pb-4 border-t border-app-border pt-4">
+                  <h2 className="text-[11px] font-bold text-app-muted uppercase tracking-wider">Abrechnungssystem</h2>
+                  <div className="space-y-2">
+                    {SCORING_SYSTEMS.map((system) => (
+                      <button key={system.id} type="button" onClick={() => setScoringSystem(system.id)} className={`w-full text-left p-3 rounded-xl border transition-all ${scoringSystem === system.id ? 'bg-amber-500/10 border-amber-500/50 shadow-sm' : 'bg-app-base/50 border-app-border hover:border-app-borderstrong'}`}>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className={`text-sm font-bold ${scoringSystem === system.id ? 'text-amber-400' : 'text-app-text'}`}>{system.name}</span>
+                          <div className={`w-3.5 h-3.5 rounded-full border-[1.5px] flex items-center justify-center shrink-0 ${scoringSystem === system.id ? 'border-amber-500' : 'border-app-muted'}`}>
+                            {scoringSystem === system.id && <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-app-faint leading-snug">{system.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            <div className="p-3 pb-2 bg-app-panel border-t border-app-border shrink-0 flex flex-col items-center">
+              <button type="submit" form="setup-form" className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 font-bold py-3.5 rounded-xl shadow-[0_8px_30px_rgb(245,158,11,0.2)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-base">
+                <span>Spiel starten</span><Check className="w-5 h-5" />
+              </button>
+              <span className="mt-2.5 text-[9px] text-app-faint/60 tracking-wider">© Björn Bormann</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function HistorySheet({ sessions, onClose, onViewSession }) {
+      return (
+        <div className="fixed inset-0 flex items-end sm:items-center justify-center sm:p-4 bg-app-base/80 backdrop-blur-sm transition-all animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-0 sm:fade-in" style={{ zIndex: 70 }}>
+          <div className="w-full max-w-md bg-app-panel rounded-t-2xl sm:rounded-2xl border border-app-borderstrong shadow-2xl flex flex-col max-h-[88vh] sm:max-h-[90vh]">
+            <div className="flex items-center justify-between p-4 border-b border-app-border shrink-0">
+              <h2 className="text-base font-bold text-app-text flex items-center gap-2"><Clock className="w-5 h-5 text-amber-500" /> Historie</h2>
+              <button onClick={onClose} className="p-2 text-app-text bg-app-element rounded-full hover:bg-app-border active:scale-95 transition-all shadow-sm border border-app-borderstrong/50"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="overflow-y-auto p-4 space-y-2.5 custom-scrollbar pb-6 flex-1">
+              {sessions.length === 0 ? (
+                <div className="text-center py-12 text-app-faint text-sm">Noch keine Spiele gespeichert.</div>
+              ) : (
+                sessions.map(s => {
+                  const winnerIndex = s.totals.indexOf(Math.max(...s.totals));
+                  const winnerName = s.players[winnerIndex];
+                  return (
+                    <button key={s.id} onClick={() => onViewSession(s)} className="w-full flex items-center justify-between p-3.5 bg-app-element/40 hover:bg-app-element border border-app-borderstrong/50 rounded-xl transition-colors text-left group">
+                      <div>
+                        <div className="font-bold text-app-text text-sm">{s.eventMeta?.eventName || new Date(s.gameDate).toLocaleDateString('de-DE')}</div>
+                        <div className="text-[10px] text-app-muted mt-1">{s.rounds.length} Runden {s.seriesLimit > 0 ? `(Serie)` : ''} • {s.players.length} Spieler</div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                           <div className="text-xs font-bold text-amber-400 flex items-center justify-end gap-1"><Award className="w-3 h-3" /> {winnerName}</div>
+                           <div className="text-[10px] text-app-faint">{s.totals[winnerIndex]} Pkt</div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-app-faint group-hover:text-app-text" />
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const computePlayerStats = (players, rounds) => {
+      return players.map((name, pIdx) => {
+        let gamesPlayed = 0;
+        let wins = 0;
+        let losses = 0;
+        let pointsAsDeclarer = 0;
+        let ramschPlayed = 0;
+        let ramschImpactPoints = 0;
+        let bockRoundsCount = 0;
+        let bockPointsTotal = 0;
+        let bestRound = 0;
+        let worstRound = 0;
+
+        rounds.forEach(r => {
+          if (r.isPassed) return;
+          
+          const myScore = r.scores[pIdx] || 0;
+          
+          if (myScore > bestRound) bestRound = myScore;
+          if (myScore < worstRound) worstRound = myScore;
+
+          if (r.isRamsch) {
+            if (r.declarerIndex === pIdx) {
+              ramschPlayed++;
+              ramschImpactPoints += myScore;
+            }
+          } else {
+            if (r.declarerIndex === pIdx) {
+              gamesPlayed++;
+              if (r.won) wins++;
+              else losses++;
+              pointsAsDeclarer += myScore;
+              
+              if (r.isBock) {
+                bockRoundsCount++;
+                bockPointsTotal += myScore;
+              }
+            }
+          }
+        });
+
+        return {
+          name, gamesPlayed, wins, losses, pointsAsDeclarer, 
+          ramschPlayed, ramschImpactPoints, 
+          bockRoundsCount, bockPointsTotal, 
+          bestRound, worstRound
+        };
+      });
+    };
+
+    const buildShareText = (players, totals, rounds, gameDate, eventMeta, scoringSystem, seriesLimit, centPerPoint, penaltyPerLoss) => {
+      const sortedPlayers = players.map((name, index) => ({ name, score: totals[index], originalIndex: index })).sort((a, b) => b.score - a.score);
+      const totalPoints = totals.reduce((a, b) => a + b, 0);
+      const isSeriesComplete = seriesLimit > 0 && rounds.length >= seriesLimit;
+
+      let title = eventMeta?.eventName ? eventMeta.eventName : `Skat ${isSeriesComplete ? 'Turnier-Serie' : 'Abend'}`;
+      let text = `🏆 ${title} (${new Date(gameDate).toLocaleDateString('de-DE')}) 🏆\nRegeln: ${scoringSystem?.name || 'Klassisch'}\nGespielte Runden: ${rounds.length}${seriesLimit > 0 ? ` / ${seriesLimit}` : ''}\n\n`;
+      
+      if (centPerPoint > 0 || penaltyPerLoss > 0) {
+        text += `💸 Finanzen:\n`;
+        if (centPerPoint > 0) text += `- Einsatz: ${centPerPoint} Cent/Punkt\n`;
+        if (penaltyPerLoss > 0) text += `- Kasse (Verlustgeld): ${penaltyPerLoss.toFixed(2).replace('.', ',')} € pro verl. Spiel\n`;
+        text += `\n`;
+      }
+      
+      sortedPlayers.forEach((p, i) => { 
+        const payoutPoints = (p.score * players.length) - totalPoints;
+        const rawMoney = payoutPoints * (centPerPoint / 100);
+        const payoutMoney = Math.abs(rawMoney).toFixed(2).replace('.', ',');
+        const sign = payoutPoints > 0 ? '+' : payoutPoints < 0 ? '-' : '±';
+        
+        const pLosses = rounds.filter(r => !r.isPassed && r.declarerIndex === p.originalIndex && !r.won).length;
+        const pPenalty = pLosses * penaltyPerLoss;
+        
+        text += `${i + 1}. ${p.name}: ${p.score} Punkte`;
+        if (centPerPoint > 0 || penaltyPerLoss > 0) {
+           let finances = [];
+           if (centPerPoint > 0) finances.push(`${sign}${payoutMoney} €`);
+           if (penaltyPerLoss > 0 && pPenalty > 0) finances.push(`Kasse: -${pPenalty.toFixed(2).replace('.', ',')} €`);
+           if (finances.length > 0) text += ` (${finances.join(' | ')})`;
+        }
+        text += `\n`;
+      });
+      if (sortedPlayers.length > 0) text += `\n👑 Glückwunsch an ${sortedPlayers[0].name}! 🍻`;
+      return text;
+    };
+
+    function ScoreChart({ players, rounds }) {
+      if (!rounds || rounds.length === 0) return null;
+
+      const chartColors = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'];
+
+      const runningTotals = [new Array(players.length).fill(0)];
+      let current = new Array(players.length).fill(0);
+      
+      rounds.forEach(r => {
+        if (!r.isPassed) {
+          current = current.map((c, i) => c + (r.scores[i] || 0));
+        }
+        runningTotals.push([...current]);
+      });
+
+      const allScores = runningTotals.flat();
+      const minScore = Math.min(0, ...allScores);
+      const maxScore = Math.max(10, ...allScores);
+
+      const w = 400;
+      const h = 200;
+      const padX = 35;
+      const padY = 25;
+
+      const getX = (roundIdx) => padX + (roundIdx / rounds.length) * (w - 2 * padX);
+      const getY = (score) => {
+        const range = maxScore - minScore === 0 ? 1 : maxScore - minScore;
+        return h - padY - ((score - minScore) / range) * (h - 2 * padY);
+      };
+
+      return (
+        <div className="bg-app-element/40 border border-app-borderstrong rounded-2xl p-4 mb-2">
+          <h3 className="font-bold text-app-text mb-4 text-xs uppercase tracking-wider flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-amber-500" /> Punkteverlauf
+          </h3>
+          <div className="relative w-full aspect-[2/1] bg-app-panel rounded-xl border border-app-border overflow-hidden">
+            <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-full overflow-visible text-app-faint">
+              {/* Null-Linie */}
+              <line x1={padX} y1={getY(0)} x2={w - padX} y2={getY(0)} stroke="currentColor" strokeWidth="1" strokeDasharray="4" opacity="0.4" />
+              
+              {/* Achsen-Werte */}
+              <text x={padX - 8} y={getY(maxScore)} fontSize="10" fill="currentColor" textAnchor="end" dominantBaseline="middle">{maxScore}</text>
+              <text x={padX - 8} y={getY(0)} fontSize="10" fill="currentColor" textAnchor="end" dominantBaseline="middle">0</text>
+              <text x={padX - 8} y={getY(minScore)} fontSize="10" fill="currentColor" textAnchor="end" dominantBaseline="middle">{minScore}</text>
+
+              {/* Graphen zeichnen */}
+              {players.map((p, pIdx) => {
+                const points = runningTotals.map((rt, rIdx) => `${getX(rIdx)},${getY(rt[pIdx])}`).join(' ');
+                return (
+                  <g key={pIdx}>
+                    <polyline points={points} fill="none" stroke={chartColors[pIdx]} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    {rounds.length <= 30 && runningTotals.map((rt, rIdx) => (
+                      <circle key={rIdx} cx={getX(rIdx)} cy={getY(rt[pIdx])} r="3" fill={chartColors[pIdx]} stroke="rgb(var(--c-panel))" strokeWidth="1.5" />
+                    ))}
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+          <div className="flex flex-wrap gap-4 mt-4 justify-center">
+            {players.map((p, pIdx) => (
+              <div key={pIdx} className="flex items-center gap-1.5 text-[10px] font-bold text-app-text uppercase tracking-wider">
+                <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: chartColors[pIdx] }} />
+                {p}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function StatsSheet({ stats, title, onClose, players, rounds }) {
+      const sortedStats = [...stats].sort((a, b) => b.wins - a.wins);
+
+      return (
+        <div className="fixed inset-0 flex items-end sm:items-center justify-center sm:p-4 bg-app-base/80 backdrop-blur-sm animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-0 sm:fade-in" style={{ zIndex: 100 }}>
+          <div className="w-full max-w-md bg-app-panel rounded-t-2xl sm:rounded-2xl border border-app-borderstrong shadow-2xl flex flex-col max-h-[88vh] sm:max-h-[90vh]">
+            <div className="flex items-center justify-between p-4 border-b border-app-border shrink-0">
+              <h2 className="text-lg font-bold text-app-text flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-amber-500" /> {title}
+              </h2>
+              <button onClick={onClose} className="p-2 text-app-text bg-app-element rounded-full hover:bg-app-border active:scale-95 transition-all shadow-sm border border-app-borderstrong/50"><X className="w-5 h-5" /></button>
+            </div>
+            
+            <div className="p-4 overflow-y-auto custom-scrollbar space-y-4 pb-6">
+              <ScoreChart players={players} rounds={rounds} />
+
+              {sortedStats.map(s => (
+                <div key={s.name} className="bg-app-element/40 border border-app-borderstrong rounded-2xl p-4">
+                  <h3 className="font-bold text-amber-500 mb-3 text-lg flex items-center justify-between">
+                    {s.name}
+                    <span className="text-xs text-app-muted font-normal bg-app-base px-2 py-1 rounded-md">{s.gamesPlayed} Spiele</span>
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-2.5 text-sm">
+                    {/* Win Rate */}
+                    <div className="bg-app-panel p-2.5 rounded-xl border border-app-border shadow-sm">
+                      <div className="text-[10px] font-bold text-app-muted uppercase tracking-wider mb-0.5">Gewinnquote</div>
+                      <div className="font-black text-app-text text-xl flex items-center justify-between">
+                        <span>{s.gamesPlayed > 0 ? Math.round((s.wins/s.gamesPlayed)*100) : 0}%</span>
+                        <span className="text-sm font-bold text-app-muted bg-app-base px-1.5 py-0.5 rounded border border-app-borderstrong/50" title="Gewonnen : Verloren">{s.wins}:{s.losses}</span>
+                      </div>
+                      <div className="text-[10px] mt-0.5">
+                         <span className="text-emerald-500">{s.wins} gew.</span> <span className="text-app-faint">•</span> <span className="text-rose-500">{s.losses} verl.</span>
+                      </div>
+                    </div>
+
+                    {/* Average */}
+                    <div className="bg-app-panel p-2.5 rounded-xl border border-app-border shadow-sm">
+                      <div className="text-[10px] font-bold text-app-muted uppercase tracking-wider mb-0.5">Ø Punkte</div>
+                      <div className="font-black text-app-text text-xl">{s.gamesPlayed > 0 ? (s.pointsAsDeclarer / s.gamesPlayed).toFixed(1) : '0.0'}</div>
+                      <div className="text-[10px] text-app-faint mt-0.5">Pro Alleinspiel</div>
+                    </div>
+
+                    {/* Ramsch */}
+                    <div className="bg-app-panel p-2.5 rounded-xl border border-app-border shadow-sm">
+                      <div className="text-[10px] font-bold text-app-muted uppercase tracking-wider mb-0.5">Ramsch-Bilanz</div>
+                      <div className="font-black text-rose-400 text-lg">{s.ramschPlayed}x <span className="text-sm font-medium opacity-70">verloren</span></div>
+                      <div className="text-[10px] text-app-faint mt-0.5">{s.ramschImpactPoints} Pkt insg.</div>
+                    </div>
+
+                    {/* Bock */}
+                    <div className="bg-app-panel p-2.5 rounded-xl border border-app-border shadow-sm">
+                      <div className="text-[10px] font-bold text-app-muted uppercase tracking-wider mb-0.5">Bockrunden</div>
+                      <div className="font-black text-amber-500 text-lg">{s.bockRoundsCount}x <span className="text-sm font-medium opacity-70">gespielt</span></div>
+                      <div className="text-[10px] text-app-faint mt-0.5">{s.bockPointsTotal > 0 ? `+${s.bockPointsTotal}` : s.bockPointsTotal} Pkt insg.</div>
+                    </div>
+
+                    {/* Extremes */}
+                    <div className="col-span-2 bg-app-panel p-2.5 rounded-xl border border-app-border shadow-sm flex justify-between items-center mt-1">
+                      <div>
+                         <div className="text-[10px] font-bold text-app-muted uppercase tracking-wider">Höchster Gewinn</div>
+                         <div className="font-black text-emerald-500">{s.bestRound > 0 ? `+${s.bestRound}` : s.bestRound}</div>
+                      </div>
+                      <div className="w-px h-8 bg-app-border mx-2"></div>
+                      <div className="text-right">
+                         <div className="text-[10px] font-bold text-app-muted uppercase tracking-wider">Höchster Verlust</div>
+                         <div className="font-black text-rose-500">{s.worstRound < 0 ? s.worstRound : 0}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Protocol Data Generator for specific view format
+    const getProtocolGameInfo = (r) => {
+        if (r.isPassed) return 'Eingepasst';
+        if (r.isRamsch) return 'Ramsch';
+        let info = '';
+        if (r.details?.gameType === 'null') {
+            const l = r.details.nullType?.label || '';
+            info = l === 'Einfach' ? 'Null' : `Null ${l}`;
+        } else if (r.details?.gameType === 'suit') {
+            info = r.details.suit?.label || '';
+            if (r.details.hand) info += ' Hand';
+            if (r.details.schneider || r.details.ansagen >= 1) info += ' S';
+            if (r.details.schwarz || r.details.ansagen >= 2) info += ' Sw';
+            if (r.details.ansagen >= 3) info += ' O';
+        } else {
+            info = 'Manuell';
+        }
+        if (r.details?.kontra === 1) info += ' K';
+        if (r.details?.kontra === 2) info += ' Re';
+        if (r.details?.kontra === 3) info += ' H';
+        if (r.isBock) info += ' (B)';
+        return info;
+    };
+
+    function ProtocolSheet({ players, rounds, totals, gameDate, eventMeta, penaltyPerLoss, centPerPoint, scoringSystem, seriesLimit, onClose }) {
+      const stats = computePlayerStats(players, rounds);
+      const passedCount = rounds.filter(r => r.isPassed).length;
+      const totalPoints = totals.reduce((a, b) => a + b, 0);
+      const [shareStatus, setShareStatus] = useState('PDF Teilen / Speichern');
+
+      const handleSharePDF = async () => {
+        if (typeof window.html2pdf === 'undefined') {
+           window.print();
+           return;
+        }
+
+        setShareStatus('Wird erstellt...');
+        const element = document.getElementById('protocol-print-area');
+        const wrapper = document.getElementById('protocol-wrapper');
+        
+        const defaultName = eventMeta?.eventName ? eventMeta.eventName.replace(/[^a-z0-9]/gi, '_') : 'Skat-Protokoll';
+        const dateStr = new Date(gameDate).toLocaleDateString('de-DE').replace(/\./g, '-');
+        const filename = `${defaultName}_${dateStr}.pdf`;
+
+        const opt = {
+          margin:       10,
+          filename:     filename,
+          image:        { type: 'jpeg', quality: 0.98 },
+          // windowWidth 800 erzwingt Desktop-Ansicht, scrollY 0 fängt oben an
+          html2canvas:  { scale: 2, useCORS: true, scrollY: 0, windowWidth: 800 },
+          jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak:    { mode: ['css', 'legacy'] }
+        };
+
+        // TIEFER EINGREIFEN FÜR MOBILE BROWSER:
+        // Damit das PDF über mehrere Seiten geht, müssen wir html und body 
+        // temporär erlauben, ihre natürliche Höhe einzunehmen.
+        const htmlEl = document.documentElement;
+        const bodyEl = document.body;
+        
+        const origHtmlOverflow = htmlEl.style.overflow;
+        const origHtmlHeight = htmlEl.style.height;
+        const origBodyOverflow = bodyEl.style.overflow;
+        const origBodyHeight = bodyEl.style.height;
+
+        htmlEl.style.overflow = 'visible';
+        htmlEl.style.height = 'auto';
+        bodyEl.style.overflow = 'visible';
+        bodyEl.style.height = 'auto';
+
+        if (wrapper) {
+          wrapper.classList.remove('fixed', 'inset-0', 'overflow-y-auto');
+          wrapper.style.position = 'absolute';
+          wrapper.style.top = '0';
+          wrapper.style.left = '0';
+          wrapper.style.right = '0';
+        }
+
+        // WICHTIG: Dem Browser kurz Zeit geben, die neue (riesige) Höhe zu berechnen
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        try {
+          const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
+          const file = new File([pdfBlob], filename, { type: 'application/pdf' });
+
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: 'Skat Spielprotokoll',
+              text: 'Anbei das offizielle Spielprotokoll als PDF.'
+            });
+            setShareStatus('Geteilt!');
+          } else {
+            // Fallback to auto-download if sharing is not supported
+            const url = URL.createObjectURL(pdfBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            setShareStatus('Gespeichert!');
+          }
+        } catch (err) {
+          console.error('PDF Generation Error:', err);
+          setShareStatus('Fehler');
+        } finally {
+          // Die ursprünglichen Klassen wiederherstellen, damit man wieder normal scrollen kann
+          htmlEl.style.overflow = origHtmlOverflow;
+          htmlEl.style.height = origHtmlHeight;
+          bodyEl.style.overflow = origBodyOverflow;
+          bodyEl.style.height = origBodyHeight;
+
+          if (wrapper) {
+            wrapper.style.position = '';
+            wrapper.style.top = '';
+            wrapper.style.left = '';
+            wrapper.style.right = '';
+            wrapper.classList.add('fixed', 'inset-0', 'overflow-y-auto');
+          }
+          setTimeout(() => setShareStatus('PDF Teilen / Speichern'), 3000);
+        }
+      };
+
+      // Prepare history arrays for the table rows
+      const history = [];
+      let current = new Array(players.length).fill(0);
+      rounds.forEach((r, idx) => {
+        if (!r.isPassed) current = current.map((c, i) => c + (r.scores[i] || 0));
+        history.push({ ...r, running: [...current], index: idx + 1 });
+      });
+
+      return (
+        <div id="protocol-wrapper" className="fixed inset-0 bg-white text-black overflow-y-auto print:static print:inset-auto print:block print:w-full" style={{ zIndex: 110 }}>
+          {/* Header controls (Screen only) */}
+          <div className="sticky top-0 bg-white/95 backdrop-blur border-b border-gray-200 p-3 sm:p-4 flex flex-col sm:flex-row justify-between items-center gap-3 no-print z-10 shadow-sm">
+             <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button onClick={onClose} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 transition-colors"><X className="w-5 h-5" /></button>
+                <h2 className="font-bold text-gray-900 flex items-center gap-2 truncate"><FileText className="w-5 h-5 text-amber-500 shrink-0" /> Spielprotokoll</h2>
+             </div>
+             <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button onClick={handleSharePDF} className="flex-1 sm:flex-none justify-center bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-3 sm:px-4 rounded-lg shadow flex items-center gap-2 transition-colors">
+                  {shareStatus === 'Geteilt!' || shareStatus === 'Gespeichert!' ? <Check className="w-4 h-4" /> : (shareStatus === 'Wird erstellt...' ? <Clock className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />)} 
+                  <span className="text-sm">{shareStatus}</span>
+                </button>
+                <button onClick={() => window.print()} className="bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 px-3 sm:px-4 rounded-lg shadow flex items-center justify-center transition-colors shrink-0" title="Drucken">
+                  <Printer className="w-4 h-4" />
+                </button>
+             </div>
+          </div>
+
+          {/* Printable A4 Page Container */}
+          <div id="protocol-print-area" className="max-w-4xl mx-auto p-8 sm:p-12 print:p-0 bg-white font-sans text-sm">
+            
+            {/* Meta Header */}
+            <div className="mb-6 flex justify-between items-end border-b-2 border-gray-800 pb-4">
+               <div>
+                 <h1 className="text-2xl font-black text-gray-900 tracking-tight uppercase">{eventMeta?.eventName || 'Skat Spielprotokoll'}</h1>
+                 <div className="text-gray-600 font-medium mt-1">Datum: {new Date(gameDate).toLocaleDateString('de-DE')}</div>
+               </div>
+               <div className="text-right text-gray-800 font-medium">
+                 {eventMeta?.tableNumber && <div>Tisch Nr: <span className="font-bold">{eventMeta.tableNumber}</span></div>}
+                 {eventMeta?.seriesNumber && <div>Serie: <span className="font-bold">{eventMeta.seriesNumber}</span></div>}
+               </div>
+            </div>
+
+            {/* Main Table */}
+            <table className="w-full border-collapse mb-8 text-center text-sm">
+              <thead>
+                <tr>
+                  <th className="border border-gray-400 bg-gray-100 p-2 font-bold w-12 text-black">Nr.</th>
+                  <th className="border border-gray-400 bg-gray-100 p-2 font-black w-16 text-black">Geber</th>
+                  {players.map((p, i) => (
+                    <th key={i} className="border border-gray-400 bg-gray-100 p-2 font-black text-black">{p}</th>
+                  ))}
+                  <th className="border border-gray-400 bg-gray-100 p-2 font-bold text-left px-3 text-black">Ansage</th>
+                  <th className="border border-gray-400 bg-gray-100 p-2 font-bold w-12 text-black">V</th>
+                  <th className="border border-gray-400 bg-gray-100 p-2 font-bold w-16 text-black">Wert</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map(row => {
+                   const isDeclarerLost = !row.isPassed && !row.won;
+                   return (
+                     <tr key={row.id} className="even:bg-gray-50/50 break-inside-avoid">
+                       <td className="border border-gray-300 p-2 text-gray-700 font-medium">{row.index}</td>
+                       <td className="border border-gray-300 p-2 font-black text-black">{String.fromCharCode(65 + row.dealerIndex)}</td>
+                       
+                       {/* Running Scores */}
+                       {players.map((_, i) => {
+                          const isDecl = row.declarerIndex === i && !row.isPassed;
+                          const roundScore = row.scores[i] || 0;
+                          return (
+                             <td key={i} className={`border border-gray-300 p-1 align-middle ${isDecl ? (row.won ? 'bg-emerald-50' : 'bg-rose-50') : ''} ${row.isPassed ? 'opacity-40 text-gray-500' : ''}`}>
+                               {row.isPassed ? (
+                                 <span className="font-semibold">-</span>
+                               ) : (
+                                 <div className="flex flex-col items-center justify-center leading-tight">
+                                   {roundScore !== 0 ? (
+                                      <span className={`text-[10px] font-bold ${roundScore > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                        {roundScore > 0 ? '+' : ''}{roundScore}
+                                      </span>
+                                   ) : (
+                                      <span className="text-[10px] text-transparent select-none hidden sm:block">0</span>
+                                   )}
+                                   <span className={`text-sm font-black mt-0.5 ${isDecl ? (row.won ? 'text-emerald-800' : 'text-rose-800') : 'text-gray-900'}`}>
+                                     {row.running[i]}
+                                   </span>
+                                 </div>
+                               )}
+                             </td>
+                          );
+                       })}
+
+                       <td className="border border-gray-300 p-2 text-left px-3 font-medium text-gray-700">{getProtocolGameInfo(row)}</td>
+                       <td className="border border-gray-300 p-2 font-black text-rose-600">{isDeclarerLost ? 'X' : ''}</td>
+                       <td className="border border-gray-300 p-2 font-bold text-gray-800">{row.isPassed ? '-' : row.points}</td>
+                     </tr>
+                   );
+                })}
+              </tbody>
+              
+              {/* Table Footer - Totals */}
+              <tfoot className="break-inside-avoid">
+                <tr>
+                  <td colSpan="2" className="border-t-2 border-gray-800 bg-gray-100 p-3 font-black text-right uppercase tracking-wider">Gesamt</td>
+                  {totals.map((t, i) => (
+                    <td key={i} className={`border-t-2 border-gray-800 border-x border-x-gray-300 bg-gray-100 p-3 font-black text-base ${t > 0 ? 'text-emerald-700' : t < 0 ? 'text-rose-700' : 'text-gray-900'}`}>
+                      {t}
+                    </td>
+                  ))}
+                  <td colSpan="3" className="border-t-2 border-gray-800 bg-gray-100 p-3"></td>
+                </tr>
+                {/* W:L Ratio Footer */}
+                <tr>
+                  <td colSpan="2" className="border border-gray-300 p-2 font-bold text-right text-gray-600">G:V</td>
+                  {players.map((_, i) => (
+                    <td key={i} className="border border-gray-300 p-2 font-bold text-gray-700">{stats[i].wins}:{stats[i].losses}</td>
+                  ))}
+                  <td colSpan="3" className="border border-gray-300 p-2"></td>
+                </tr>
+              </tfoot>
+            </table>
+
+            {/* Finanzielle Abrechnung (if active) */}
+            {(centPerPoint > 0 || penaltyPerLoss > 0) && (
+              <div className="mb-8 break-inside-avoid">
+                <h3 className="text-lg font-black text-gray-900 mb-3 border-b-2 border-gray-800 pb-1">Finanzielle Abrechnung (Auszahlung)</h3>
+                <table className="w-full border-collapse text-center text-sm mb-2">
+                  <thead>
+                    <tr>
+                      <th className="border border-gray-400 bg-gray-100 p-2 font-black text-black text-left">Spieler</th>
+                      <th className="border border-gray-400 bg-gray-100 p-2 font-bold text-black">Punkte</th>
+                      {centPerPoint > 0 && <th className="border border-gray-400 bg-gray-100 p-2 font-bold text-black">Netto-Gewinn/Verlust</th>}
+                      {penaltyPerLoss > 0 && <th className="border border-gray-400 bg-gray-100 p-2 font-bold text-black">Kasse (Verlustgeld)</th>}
+                      <th className="border border-gray-400 bg-gray-200 p-2 font-black text-gray-900">End-Saldo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {players.map((p, i) => {
+                      const payoutPoints = (totals[i] * players.length) - totalPoints;
+                      const netPayout = payoutPoints * (centPerPoint / 100);
+                      const penalty = stats[i].losses * penaltyPerLoss;
+                      const finalBalance = (centPerPoint > 0 ? netPayout : 0) - penalty;
+
+                      return (
+                        <tr key={i} className="even:bg-gray-50/50">
+                          <td className="border border-gray-300 p-2 font-black text-black text-left">{p}</td>
+                          <td className="border border-gray-300 p-2 font-bold text-black">{totals[i]}</td>
+                          {centPerPoint > 0 && (
+                            <td className={`border border-gray-300 p-2 font-semibold ${netPayout > 0 ? 'text-emerald-700' : netPayout < 0 ? 'text-rose-700' : 'text-gray-900'}`}>
+                              {netPayout > 0 ? '+' : ''}{netPayout.toFixed(2).replace('.', ',')} €
+                            </td>
+                          )}
+                          {penaltyPerLoss > 0 && (
+                            <td className="border border-gray-300 p-2 font-semibold text-rose-700">
+                              {penalty > 0 ? `-${penalty.toFixed(2).replace('.', ',')} €` : '0,00 €'}
+                            </td>
+                          )}
+                          <td className={`border border-gray-400 p-2 font-black text-base bg-gray-100 ${finalBalance > 0 ? 'text-emerald-800' : finalBalance < 0 ? 'text-rose-800' : 'text-gray-900'}`}>
+                            {finalBalance > 0 ? '+' : ''}{finalBalance.toFixed(2).replace('.', ',')} €
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {centPerPoint > 0 && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    * <span className="font-semibold">Abrechnungs-Formel:</span> (Eigene Punkte × Spieleranzahl) - Gesamtsumme aller Punkte ({totalPoints}) × {centPerPoint.toFixed(1).replace('.', ',')} Cent.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Meta Footer */}
+            <div className="flex justify-between items-center text-sm text-gray-800 mb-16 break-inside-avoid">
+               <div>Eingepasste Runden: <strong>{passedCount}</strong></div>
+               <div>Spieler-Kürzel: {players.map((p,i) => <span key={i} className="ml-2 font-bold text-black"><strong>{String.fromCharCode(65+i)}</strong>={p}</span>)}</div>
+            </div>
+
+            {/* Signatures */}
+            <div className="flex justify-around items-end mt-16 pt-8 break-inside-avoid">
+               {players.map((p, i) => (
+                 <div key={i} className="flex flex-col items-center">
+                    <div className="w-40 border-b border-gray-800 mb-2"></div>
+                    <span className="text-black text-xs font-bold">Unterschrift {p}</span>
+                 </div>
+               ))}
+            </div>
+
+          </div>
+        </div>
+      );
+    }
+
+    function SummarySheet({ players, totals, rounds, gameDate, eventMeta, scoringSystem, seriesLimit, onClose, onReset, onFinishEvening, viewMode = 'active', onDeleteHistory, onOpenStats, onOpenProtocol, centPerPoint, penaltyPerLoss, onRestore, hasActiveGame }) {
+      const [showConfirm, setShowConfirm] = useState(false);
+      const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
+      const [copied, setCopied] = useState(false);
+      
+      const sortedPlayers = players.map((name, index) => ({ name, score: totals[index], originalIndex: index })).sort((a, b) => b.score - a.score);
+      const totalPoints = totals.reduce((a, b) => a + b, 0);
+
+      const isSeriesComplete = seriesLimit > 0 && rounds.length >= seriesLimit;
+
+      const handleCopy = async () => {
+        const text = buildShareText(players, totals, rounds, gameDate, eventMeta, scoringSystem, seriesLimit, centPerPoint, penaltyPerLoss);
+        try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch (err) {}
+      };
+
+      return (
+        <div className="fixed inset-0 flex items-end sm:items-center justify-center sm:p-4 bg-app-base/70 backdrop-blur-sm animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-0 sm:fade-in" style={{ zIndex: 80 }}>
+          <div className="w-full max-w-sm bg-app-panel rounded-t-2xl sm:rounded-2xl border border-app-borderstrong shadow-2xl flex flex-col max-h-[88vh] sm:max-h-[90vh]">
+            <div className="flex items-center justify-between p-4 border-b border-app-border shrink-0">
+              <h2 className="text-base font-bold text-app-text">{viewMode === 'history' ? 'Abend im Detail' : (isSeriesComplete ? 'Turnier-Serie beendet!' : 'Zwischenstand')}</h2>
+              <button onClick={onClose} className="p-2 text-app-text bg-app-element rounded-full hover:bg-app-border active:scale-95 transition-all shadow-sm border border-app-borderstrong/50"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-4 overflow-y-auto custom-scrollbar space-y-5 pb-6">
+              <div className="space-y-2">
+                {sortedPlayers.map((player, idx) => {
+                  const payoutPoints = (player.score * players.length) - totalPoints;
+                  const rawMoney = payoutPoints * (centPerPoint / 100);
+                  const payoutMoney = Math.abs(rawMoney).toFixed(2).replace('.', ',');
+                  const sign = payoutPoints > 0 ? '+' : payoutPoints < 0 ? '-' : '±';
+                  
+                  const playerLosses = rounds.filter(r => !r.isPassed && r.declarerIndex === player.originalIndex && !r.won).length;
+                  const penaltyMoney = playerLosses * penaltyPerLoss;
+                  
+                  return (
+                    <div key={idx} className={`flex items-start justify-between p-3 rounded-xl border ${idx === 0 ? 'bg-gradient-to-r from-amber-500/20 to-orange-600/20 border-amber-500/50 shadow-sm' : 'bg-app-element/50 border-app-borderstrong/50'}`}>
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-7 h-7 flex items-center justify-center rounded-full font-bold text-[11px] shrink-0 ${idx === 0 ? 'bg-amber-500 text-slate-950' : 'bg-slate-700 text-slate-300'}`}>{idx === 0 ? <Award className="w-4 h-4" /> : idx + 1}</div>
+                        <span className={`font-semibold text-sm pt-1 ${idx === 0 ? 'text-amber-400' : 'text-app-text'}`}>{player.name}</span>
+                      </div>
+                      <div className="flex flex-col items-end text-right">
+                        <span className={`text-lg font-black leading-none ${player.score > 0 ? 'text-emerald-500' : player.score < 0 ? 'text-rose-400' : 'text-app-faint'}`}>{player.score}</span>
+                        <div className="flex flex-col items-end mt-1.5 space-y-0.5">
+                          {centPerPoint > 0 && (
+                            <span className={`text-[10px] font-bold ${payoutPoints > 0 ? 'textemerald-500' : payoutPoints < 0 ? 'text-rose-500' : 'text-app-faint'}`}>
+                              {sign}{payoutMoney} € <span className="opacity-60 font-normal">Auszahlung</span>
+                            </span>
+                          )}
+                          {penaltyPerLoss > 0 && penaltyMoney > 0 && (
+                            <span className="text-[10px] font-bold text-rose-400">
+                              -{penaltyMoney.toFixed(2).replace('.', ',')} € <span className="opacity-60 font-normal">in Kasse ({playerLosses}x)</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              <div className="text-center text-xs text-app-faint mb-2">Runden gesamt: <span className="font-bold text-app-text">{rounds.length} {seriesLimit > 0 ? `von ${seriesLimit}` : ''}</span></div>
+              
+              <div className="space-y-2.5 mb-2.5">
+                <button onClick={onOpenProtocol} className="w-full py-2.5 rounded-xl font-bold bg-app-element text-app-text border border-app-borderstrong hover:bg-app-border transition-colors flex justify-center items-center gap-2 text-xs">
+                  <FileText className="w-4 h-4 text-amber-500" /><span>Protokoll (Tabelle) anzeigen / drucken</span>
+                </button>
+                <div className="grid grid-cols-2 gap-2.5">
+                   <button onClick={onOpenStats} className="w-full py-2.5 rounded-xl font-bold bg-app-element text-amber-500 border border-app-borderstrong hover:bg-app-border hover:border-amber-500/50 transition-colors flex justify-center items-center gap-1.5 text-xs">
+                     <TrendingUp className="w-4 h-4" /><span>Statistiken</span>
+                   </button>
+                   <button onClick={handleCopy} className="w-full py-2.5 rounded-xl font-medium text-xs bg-app-element text-app-text border border-app-borderstrong hover:bg-app-border flex justify-center items-center gap-1.5">{copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}<span className={copied ? 'text-emerald-500' : ''}>{copied ? 'Kopiert!' : 'Kopieren'}</span></button>
+                </div>
+                <button onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(buildShareText(players, totals, rounds, gameDate, eventMeta, scoringSystem, seriesLimit, centPerPoint, penaltyPerLoss))}`, '_blank')} className="w-full py-2.5 rounded-xl font-bold bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/30 hover:bg-[#25D366]/20 flex justify-center items-center gap-1.5 text-xs"><MessageCircle className="w-4 h-4" /><span>Mit WhatsApp teilen</span></button>
+              </div>
+
+              <div className="pt-4 border-t border-app-border">
+                {!showConfirm && !showRestoreConfirm ? (
+                  viewMode === 'history' ? (
+                    <div className="space-y-2">
+                      <button onClick={() => hasActiveGame ? setShowRestoreConfirm(true) : onRestore()} className="w-full py-3 rounded-xl font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 flex justify-center items-center gap-1.5 text-sm transition-colors shadow-sm"><RotateCcw className="w-4 h-4" /><span>Spiel fortsetzen & Korrigieren</span></button>
+                      <button onClick={() => setShowConfirm(true)} className="w-full py-2.5 rounded-xl font-medium text-rose-500 bg-rose-500/10 hover:bg-rose-500/20 flex justify-center items-center gap-1.5 text-sm"><Trash2 className="w-4 h-4" /><span>Aus Historie löschen</span></button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <button onClick={onFinishEvening} className={`w-full py-3 rounded-xl font-bold text-slate-950 flex justify-center items-center gap-1.5 text-sm transition-colors ${isSeriesComplete ? 'bg-gradient-to-r from-emerald-500 to-teal-500 shadow-[0_8px_30px_rgb(16,185,129,0.3)] animate-pulse hover:scale-[1.02]' : 'bg-emerald-500 hover:bg-emerald-400'}`}>
+                        <Flag className="w-4 h-4" /><span>{isSeriesComplete ? 'Serie speichern & beenden' : 'Abend beenden & Speichern'}</span>
+                      </button>
+                      <button onClick={() => setShowConfirm(true)} className="w-full py-2 rounded-xl font-medium text-app-faint hover:text-rose-400 hover:bg-app-element flex justify-center items-center text-xs transition-colors">Runden verwerfen (ohne Speichern)</button>
+                    </div>
+                  )
+                ) : showRestoreConfirm ? (
+                  <div className="space-y-2.5">
+                    <p className="text-center text-xs font-semibold text-amber-500">Achtung: Dein aktuelles, ungespeichertes Spiel wird dabei überschrieben!</p>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <button onClick={() => setShowRestoreConfirm(false)} className="py-2.5 rounded-xl font-medium text-sm bg-app-element text-app-text hover:bg-app-border">Abbrechen</button>
+                      <button onClick={onRestore} className="py-2.5 rounded-xl font-bold text-sm bg-amber-500 text-slate-950 hover:bg-amber-400">Überschreiben</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    <p className="text-center text-xs font-semibold text-rose-400">{viewMode === 'history' ? 'Diesen Abend wirklich löschen?' : 'Runden wirklich verwerfen?'}</p>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <button onClick={() => setShowConfirm(false)} className="py-2.5 rounded-xl font-medium text-sm bg-app-element text-app-text hover:bg-app-border">Abbrechen</button>
+                      <button onClick={viewMode === 'history' ? onDeleteHistory : onReset} className="py-2.5 rounded-xl font-bold text-sm bg-rose-500 text-slate-950 hover:bg-rose-400">{viewMode === 'history' ? 'Ja, löschen' : 'Verwerfen'}</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function AddRoundSheet({ players, roundToEdit, currentDealerIndex, activeBockRounds, onClose, onSave, onDelete }) {
+      const isEditing = !!roundToEdit;
+      
+      const defaultDeclarer = players.length === 4 ? (currentDealerIndex + 1) % 4 : 0;
+      const [declarer, setDeclarer] = useState(isEditing ? roundToEdit.declarerIndex : defaultDeclarer);
+      
+      const [gameType, setGameType] = useState(isEditing && roundToEdit.isRamsch ? 'ramsch' : (isEditing && roundToEdit.details?.gameType ? roundToEdit.details.gameType : 'suit'));
+      const [mode, setMode] = useState((isEditing || gameType === 'ramsch') ? (roundToEdit?.details?.mode || 'manual') : 'calc');
+      
+      const [isBock, setIsBock] = useState(isEditing ? roundToEdit.isBock : activeBockRounds > 0);
+      const [kontra, setKontra] = useState(isEditing ? roundToEdit.details?.kontra || 0 : 0);
+      
+      const [suit, setSuit] = useState(isEditing && roundToEdit.details?.suit ? roundToEdit.details.suit : GAME_SUITS[0]);
+      
+      const [jacks, setJacks] = useState(isEditing && roundToEdit.details?.jacks ? roundToEdit.details.jacks : { c: true, s: false, h: false, d: false });
+      const [extraSpitzen, setExtraSpitzen] = useState(isEditing && roundToEdit.details?.extraSpitzen ? roundToEdit.details.extraSpitzen : 0);
+      
+      const [hand, setHand] = useState(isEditing && roundToEdit.details?.hand ? roundToEdit.details.hand : false);
+      const [schneider, setSchneider] = useState(isEditing && roundToEdit.details?.schneider ? roundToEdit.details.schneider : false);
+      const [schwarz, setSchwarz] = useState(isEditing && roundToEdit.details?.schwarz ? roundToEdit.details.schwarz : false);
+      const [ansagen, setAnsagen] = useState(isEditing && roundToEdit.details?.ansagen ? roundToEdit.details.ansagen : 0);
+      const [nullType, setNullType] = useState(isEditing && roundToEdit.details?.nullType ? roundToEdit.details.nullType : NULL_GAMES[0]);
+      
+      const [isOverbid, setIsOverbid] = useState(isEditing && roundToEdit.details?.isOverbid ? roundToEdit.details.isOverbid : false);
+      const [bidValue, setBidValue] = useState(isEditing && roundToEdit.details?.bidValue ? roundToEdit.details.bidValue : '');
+
+      const calculateInversePoints = () => {
+        if (!roundToEdit || roundToEdit.isPassed) return '';
+        let p = Math.abs(roundToEdit.points);
+        if (roundToEdit.isBock) p = p / 2;
+        if (roundToEdit.details?.kontra) p = p / Math.pow(2, roundToEdit.details.kontra);
+        return String(p);
+      };
+      
+      const [manualPoints, setManualPoints] = useState(isEditing ? calculateInversePoints() : '');
+
+      useEffect(() => { if (gameType === 'ramsch') { setMode('manual'); setKontra(0); setIsOverbid(false); } }, [gameType]);
+
+      const spitzen = useMemo(() => {
+        let s = 0;
+        if (jacks.c) {
+            s = 1; if (jacks.s) { s = 2; if (jacks.h) { s = 3; if (jacks.d) s = 4; } }
+        } else {
+            s = 1; if (!jacks.s) { s = 2; if (!jacks.h) { s = 3; if (!jacks.d) s = 4; } }
+        }
+        return s + (suit.id === 'grand' ? 0 : extraSpitzen);
+      }, [jacks, extraSpitzen, suit.id]);
+
+      const calculatedPoints = useMemo(() => {
+        let base = 0;
+        if (mode === 'manual') {
+          base = parseInt(manualPoints) || 0;
+        } else {
+          if (gameType === 'null') base = nullType.value;
+          else {
+            let multiplier = spitzen + 1 + (hand ? 1 : 0) + (schneider ? 1 : 0) + (schwarz ? 1 : 0) + ansagen;
+            base = suit.base * multiplier;
+            
+            if (isOverbid && bidValue > 0 && base < bidValue) {
+               base = Math.ceil(bidValue / suit.base) * suit.base;
+            }
+          }
+        }
+        return base * (isBock ? 2 : 1) * Math.pow(2, kontra);
+      }, [mode, manualPoints, gameType, suit, spitzen, hand, schneider, schwarz, ansagen, nullType, isBock, kontra, isOverbid, bidValue]);
+
+      const handleSaveClick = (won) => {
+        const isGameWon = isOverbid ? false : won;
+        const roundDetails = {
+           mode, gameType, suit, spitzen, jacks, extraSpitzen, hand, schneider, schwarz, ansagen, nullType, kontra, isOverbid, bidValue
+        };
+        onSave({ declarerIndex: declarer, points: calculatedPoints, won: isGameWon, isPassed: false, isRamsch: gameType === 'ramsch', isBock }, roundDetails);
+      };
+
+      const handlePassClick = () => {
+        onSave({ declarerIndex: 0, points: 0, won: true, isPassed: true, isRamsch: false, isBock: false }, { mode: 'manual' });
+      };
+
+      return (
+        <div className="fixed inset-0 flex items-end sm:items-center justify-center sm:p-4 bg-app-base/70 backdrop-blur-sm animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-0 sm:fade-in" style={{ zIndex: 90 }}>
+          <div className="w-full max-w-md bg-app-panel rounded-t-2xl sm:rounded-2xl border border-app-borderstrong flex flex-col max-h-[88vh] sm:max-h-[90vh]">
+            <div className="flex items-center justify-between p-4 border-b border-app-border shrink-0">
+              <h2 className="text-base font-bold text-app-text">{isEditing ? 'Runde bearbeiten' : 'Ergebnis eintragen'}</h2>
+              <div className="flex items-center gap-2">
+                {isEditing && <button onClick={() => onDelete(roundToEdit.id)} className="p-2 text-rose-500 hover:text-rose-400 hover:bg-rose-500/20 rounded-full transition-colors"><Trash2 className="w-5 h-5" /></button>}
+                <button onClick={onClose} className="p-2 text-app-text bg-app-element rounded-full hover:bg-app-border active:scale-95 transition-all shadow-sm border border-app-borderstrong/50"><X className="w-5 h-5" /></button>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto p-4 space-y-5 custom-scrollbar pb-6">
+              
+              {!isEditing && (
+                <button onClick={handlePassClick} className="w-full py-3 rounded-xl font-bold bg-app-element text-app-muted border border-app-border hover:bg-app-borderstrong hover:text-app-text transition-colors text-sm uppercase tracking-wider">
+                  Runde Eingepasst
+                </button>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold text-app-muted uppercase tracking-wider">{gameType === 'ramsch' ? 'Verlierer' : 'Alleinspieler'}</label>
+                <div className="flex gap-1">
+                  {players.map((p, i) => {
+                    const isDealer = players.length === 4 && i === currentDealerIndex;
+                    return (
+                      <button key={i} disabled={isDealer} onClick={() => setDeclarer(i)} className={`flex-1 py-2 text-xs font-medium rounded-lg border ${isDealer ? 'opacity-30 border-app-border bg-app-panel' : declarer === i ? 'bg-slate-700 text-white border-slate-500 shadow-sm' : 'text-app-faint border-app-border bg-app-element hover:bg-app-borderstrong'}`}>
+                        <span className="truncate block px-1">{p} {isDealer && '(G)'}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center bg-app-element/50 p-1.5 rounded-xl border border-app-borderstrong">
+                <div className="flex gap-1">
+                  <button onClick={() => setGameType('suit')} className={`text-[10px] px-3 py-1.5 rounded-lg font-bold ${gameType === 'suit' ? 'bg-slate-700 text-white' : 'text-app-faint'}`}>Farb/G</button>
+                  <button onClick={() => setGameType('null')} className={`text-[10px] px-3 py-1.5 rounded-lg font-bold ${gameType === 'null' ? 'bg-slate-700 text-white' : 'text-app-faint'}`}>Null</button>
+                  <button onClick={() => setGameType('ramsch')} className={`text-[10px] px-3 py-1.5 rounded-lg font-bold ${gameType === 'ramsch' ? 'bg-slate-700 text-rose-400' : 'text-app-faint'}`}>Ramsch</button>
+                </div>
+                <div className="flex gap-1 pl-2 border-l border-app-border">
+                  <button onClick={() => setMode('calc')} disabled={gameType === 'ramsch'} className={`text-[10px] px-2 py-1.5 rounded-lg ${mode === 'calc' ? 'text-amber-500 bg-amber-500/10' : 'text-app-faint'} disabled:opacity-30`}>Rechner</button>
+                  <button onClick={() => setMode('manual')} className={`text-[10px] px-2 py-1.5 rounded-lg ${mode === 'manual' ? 'text-amber-500 bg-amber-500/10' : 'text-app-faint'}`}>Manuell</button>
+                </div>
+              </div>
+
+              {mode === 'manual' ? (
+                <div className="space-y-3 py-2 flex flex-col items-center">
+                  <div className="w-full bg-app-base border border-app-borderstrong rounded-xl px-4 py-4 flex items-center justify-center min-h-[72px] shadow-inner">
+                    {manualPoints ? (
+                       <span className="text-4xl font-black text-amber-500 tracking-wider">{manualPoints}</span>
+                    ) : (
+                       <span className="text-sm font-medium text-app-faint">{gameType === 'ramsch' ? 'Minus-Punkte (z.B. 40)' : 'Punkte (z.B. 36)'}</span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 w-full max-w-[280px] select-none">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+                      <button key={num} type="button" onClick={() => setManualPoints(p => p.length < 4 ? p + num : p)} className="bg-app-element/60 hover:bg-app-element active:bg-app-borderstrong active:scale-95 border border-app-border rounded-xl py-3.5 text-2xl font-bold text-app-text transition-all">
+                        {num}
+                      </button>
+                    ))}
+                    <button type="button" onClick={() => setManualPoints('')} className="bg-app-element/30 hover:bg-app-element active:bg-app-borderstrong active:scale-95 border border-app-border rounded-xl py-3.5 text-xl font-bold text-rose-400 transition-all">
+                      C
+                    </button>
+                    <button type="button" onClick={() => setManualPoints(p => p.length < 4 ? p + '0' : p)} className="bg-app-element/60 hover:bg-app-element active:bg-app-borderstrong active:scale-95 border border-app-border rounded-xl py-3.5 text-2xl font-bold text-app-text transition-all">
+                      0
+                    </button>
+                    <button type="button" onClick={() => setManualPoints(p => p.slice(0, -1))} className="bg-app-element/30 hover:bg-app-element active:bg-app-borderstrong active:scale-95 border border-app-border rounded-xl py-3.5 flex items-center justify-center text-app-faint hover:text-app-text transition-all">
+                      <Delete className="w-7 h-7" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-5">
+                    {gameType === 'suit' ? (
+                      <div className="grid grid-cols-5 gap-1.5">
+                        {GAME_SUITS.map(s => (
+                          <button key={s.id} onClick={() => setSuit(s)} className={`aspect-square rounded-xl flex flex-col items-center justify-center border ${suit.id === s.id ? 'bg-slate-700 border-slate-500 shadow-sm scale-105' : 'bg-app-base/50 border-app-border text-opacity-50'}`}>
+                            <span className={`text-xl mb-0.5 ${s.color} ${suit.id !== s.id && 'opacity-60'}`}>{s.label}</span>
+                            <span className={`text-[9px] font-bold ${suit.id === s.id ? 'text-slate-300' : 'text-app-faint'}`}>{s.base}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {NULL_GAMES.map(n => (
+                          <button key={n.id} onClick={() => setNullType(n)} className={`py-2.5 rounded-xl border flex flex-col items-center justify-center ${nullType.id === n.id ? 'bg-slate-700 border-slate-500 text-white' : 'bg-app-base/50 border-app-border text-app-faint'}`}>
+                            <span className="font-semibold text-sm">{n.label}</span>
+                            <span className="text-[10px] opacity-70">{n.value}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                  {gameType === 'suit' && (
+                    <>
+                      <div className="bg-app-element/30 p-3 rounded-2xl border border-app-border space-y-3">
+                        <label className="text-[10px] font-semibold text-app-muted uppercase tracking-wider text-center block">Buben auf der Hand?</label>
+                        <div className="flex justify-center gap-2">
+                          {[{id: 'c', label: '♣', color: 'text-slate-900 dark:text-slate-200'}, {id: 's', label: '♠', color: 'text-slate-900 dark:text-slate-200'}, {id: 'h', label: '♥', color: 'text-rose-500'}, {id: 'd', label: '♦', color: 'text-orange-500'}].map(j => (
+                              <button key={j.id} onClick={() => setJacks({...jacks, [j.id]: !jacks[j.id]})} className={`w-11 h-12 rounded-xl flex items-center justify-center text-2xl border transition-all ${jacks[j.id] ? 'bg-slate-700 border-slate-500 shadow-md scale-105' : 'bg-app-base/50 border-app-border opacity-40 hover:opacity-100'}`}>
+                                <span className={j.color}>{j.label}</span>
+                              </button>
+                          ))}
+                        </div>
+                        <div className="flex items-center justify-between px-2 pt-2 border-t border-app-border">
+                          <span className="text-[11px] font-bold text-amber-500 uppercase tracking-wider">{jacks.c ? 'Mit' : 'Ohne'} {spitzen - (suit.id === 'grand' ? 0 : extraSpitzen)} {extraSpitzen > 0 && suit.id !== 'grand' && `+ ${extraSpitzen}`}</span>
+                          <div className={`flex items-center gap-2 transition-opacity ${suit.id === 'grand' ? 'opacity-30 pointer-events-none' : ''}`}>
+                            <span className="text-[10px] text-app-faint">Weitere Trümpfe:</span>
+                            <button onClick={() => setExtraSpitzen(Math.max(0, extraSpitzen - 1))} className="w-6 h-6 rounded-md bg-slate-700 text-white flex items-center justify-center">-</button>
+                            <span className="text-xs font-bold w-2 text-center text-app-text">{suit.id === 'grand' ? 0 : extraSpitzen}</span>
+                            <button onClick={() => setExtraSpitzen(Math.min(7, extraSpitzen + 1))} className="w-6 h-6 rounded-md bg-slate-700 text-white flex items-center justify-center">+</button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-semibold text-app-muted uppercase tracking-wider block">Zusätze</label>
+                        <div className="flex flex-wrap gap-1.5">
+                          <ToggleChip label="Hand" active={hand} onClick={() => setHand(!hand)} />
+                          <ToggleChip label="Schneider" active={schneider} onClick={() => setSchneider(!schneider)} />
+                          <ToggleChip label="Schwarz" active={schwarz} onClick={() => setSchwarz(!schwarz)} />
+                        </div>
+                        {hand && (
+                          <div className="flex flex-wrap gap-1.5 mt-1.5 pt-1.5 border-t border-app-border">
+                            <button onClick={() => setAnsagen(ansagen === 1 ? 0 : 1)} className={`px-2.5 py-1.5 rounded-lg text-[10px] font-medium border ${ansagen >= 1 ? 'bg-amber-500/20 text-amber-500 border-amber-500/50' : 'bg-app-base border-app-border text-app-faint'}`}>Schneider angesagt</button>
+                            {ansagen >= 1 && <button onClick={() => setAnsagen(ansagen === 2 ? 1 : 2)} className={`px-2.5 py-1.5 rounded-lg text-[10px] font-medium border ${ansagen >= 2 ? 'bg-amber-500/20 text-amber-500 border-amber-500/50' : 'bg-app-base border-app-border text-app-faint'}`}>Schwarz angesagt</button>}
+                            {ansagen >= 2 && <button onClick={() => setAnsagen(ansagen === 3 ? 2 : 3)} className={`px-2.5 py-1.5 rounded-lg text-[10px] font-medium border ${ansagen === 3 ? 'bg-amber-500/20 text-amber-500 border-amber-500/50' : 'bg-app-base border-app-border text-app-faint'}`}>Ouvert</button>}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="bg-app-element/30 p-3 rounded-2xl border border-app-border space-y-2 mt-2">
+                        <div className="flex justify-between items-center">
+                          <label className="text-[10px] font-semibold text-app-muted uppercase tracking-wider">Im Skat überreizt?</label>
+                          <button onClick={() => setIsOverbid(!isOverbid)} className={`w-10 h-5 rounded-full relative transition-colors ${isOverbid ? 'bg-rose-500' : 'bg-app-borderstrong'}`}>
+                            <div className={`w-3.5 h-3.5 bg-white rounded-full absolute top-[3px] transition-transform ${isOverbid ? 'translate-x-[22px]' : 'translate-x-1'}`} />
+                          </button>
+                        </div>
+                        {isOverbid && (
+                           <input type="number" value={bidValue} onChange={(e) => setBidValue(Number(e.target.value))} placeholder="Gereizt bis (z.B. 48)" className="w-full mt-2 block box-border bg-app-base border border-rose-500/50 rounded-xl px-3 py-2 text-sm text-center text-app-text focus:outline-none focus:border-rose-500" />
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+              
+              <div className="pt-2">
+                {gameType !== 'ramsch' && (
+                  <div className="bg-app-element/30 p-1.5 rounded-xl border border-app-border mb-3 flex justify-between items-center">
+                    <button onClick={() => setKontra(0)} className={`flex-1 py-2 text-[10px] font-bold rounded-lg transition-colors ${kontra === 0 ? 'bg-slate-700 text-white shadow-sm' : 'text-app-faint hover:bg-app-element'}`}>Normal</button>
+                    <button onClick={() => setKontra(1)} className={`flex-1 py-2 text-[10px] font-bold rounded-lg transition-colors ${kontra === 1 ? 'bg-rose-500/20 text-rose-500 shadow-sm' : 'text-app-faint hover:bg-app-element'}`}>Kontra <span className="opacity-50">(x2)</span></button>
+                    <button onClick={() => setKontra(2)} className={`flex-1 py-2 text-[10px] font-bold rounded-lg transition-colors ${kontra === 2 ? 'bg-rose-500/40 text-rose-500 shadow-sm' : 'text-app-faint hover:bg-app-element'}`}>Re <span className="opacity-50">(x4)</span></button>
+                    <button onClick={() => setKontra(3)} className={`flex-1 py-2 text-[10px] font-bold rounded-lg transition-colors ${kontra === 3 ? 'bg-rose-500/60 text-rose-500 shadow-sm' : 'text-app-faint hover:bg-app-element'}`}>Hirsch <span className="opacity-50">(x8)</span></button>
+                  </div>
+                )}
+                <button onClick={() => setIsBock(!isBock)} className={`w-full py-2.5 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wide transition-colors ${isBock ? 'bg-amber-500/20 text-amber-500 border-amber-500/50' : 'bg-app-base border-app-border text-app-faint hover:border-app-borderstrong'}`}>
+                  Bockrunde (Punkte x2) {isBock && activeBockRounds > 0 && !isEditing ? `(Auto)` : ''}
+                </button>
+              </div>
+
+            </div>
+
+            <div className="bg-app-panel border-t border-app-border p-3 shrink-0">
+              <div className="flex justify-center items-baseline gap-1.5 mb-2">
+                <span className="text-xs text-app-muted">Gesamtwert:</span>
+                <span className={`text-2xl font-black ${gameType === 'ramsch' || isOverbid ? 'text-rose-500' : 'text-amber-500'}`}>{calculatedPoints}</span>
+              </div>
+              
+              {gameType === 'ramsch' ? (
+                <button onClick={() => handleSaveClick(false)} disabled={calculatedPoints === 0 || isNaN(calculatedPoints)} className="w-full py-3 rounded-xl text-sm font-bold bg-rose-500/10 text-rose-500 border border-rose-500/30 disabled:opacity-50">Ramsch speichern</button>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => handleSaveClick(false)} disabled={calculatedPoints === 0 || isNaN(calculatedPoints)} className={`py-3 rounded-xl text-sm font-bold bg-rose-500/10 text-rose-500 border border-rose-500/30 disabled:opacity-50 ${isOverbid ? 'col-span-2' : ''}`}>Verloren {isOverbid && '(Überreizt)'}</button>
+                  {!isOverbid && <button onClick={() => handleSaveClick(true)} disabled={calculatedPoints === 0 || isNaN(calculatedPoints)} className="py-3 rounded-xl text-sm font-bold bg-emerald-500 text-slate-950 disabled:opacity-50">{isEditing ? 'Speichern' : 'Gewonnen'}</button>}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function ToggleChip({ label, active, onClick }) {
+      return <button onClick={onClick} className={`px-3 py-1.5 rounded-xl text-[11px] font-medium border ${active ? 'bg-slate-700 text-white border-slate-500' : 'bg-app-base border-app-border text-app-faint'}`}>{label}</button>;
+    }
+
+    function ToggleSetting({ label, active, onClick, extraClass = "" }) {
+      return (
+        <div className={`flex items-center justify-between p-1 ${extraClass}`}>
+          <span className="text-xs font-medium text-app-text">{label}</span>
+          <button onClick={onClick} className={`w-10 h-5 rounded-full relative transition-colors ${active ? 'bg-amber-500' : 'bg-app-borderstrong'}`}>
+            <div className={`w-3.5 h-3.5 bg-white rounded-full absolute top-[3px] transition-transform ${active ? 'translate-x-[22px]' : 'translate-x-1'}`} />
+          </button>
+        </div>
+      );
+    }
+
+    function SettingsSheet({ players, setPlayers, rounds, setRounds, theme, setTheme, centPerPoint, setCentPerPoint, penaltyPerLoss, setPenaltyPerLoss, autoBockTriggers, setAutoBockTriggers, seriesLimit, setSeriesLimit, ruleDoubleLostHand, setRuleDoubleLostHand, onClose }) {
+      const updatePlayer = (index, value) => { const newPlayers = [...players]; newPlayers[index] = value; setPlayers(newPlayers); };
+
+      return (
+        <div className="fixed inset-0 flex items-end sm:items-center justify-center sm:p-4 bg-app-base/70 backdrop-blur-sm animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-0 sm:fade-in" style={{ zIndex: 90 }}>
+          <div className="w-full max-w-sm bg-app-panel rounded-t-2xl sm:rounded-2xl border border-app-borderstrong shadow-2xl overflow-hidden flex flex-col max-h-[88vh] sm:max-h-[90vh]">
+            <div className="flex items-center justify-between p-4 border-b border-app-border shrink-0">
+              <h2 className="text-base font-bold text-app-text">Einstellungen</h2>
+              <button onClick={onClose} className="p-2 text-app-text bg-app-element rounded-full hover:bg-app-border active:scale-95 transition-all shadow-sm border border-app-borderstrong/50"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-4 space-y-5 overflow-y-auto custom-scrollbar pb-6">
+              
+              <div className="space-y-2.5">
+                <h3 className="text-[10px] font-bold text-app-muted uppercase tracking-wider">Turnier-Modus</h3>
+                <div className="bg-app-element/50 p-3 rounded-xl border border-app-border space-y-3">
+                   <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-semibold text-app-text">Serienlänge</span>
+                   </div>
+                   <div className="flex gap-2">
+                    {[0, 24, 36, 48].map(limit => (
+                      <button key={limit} type="button" onClick={() => setSeriesLimit(limit)} className={`flex-1 py-1.5 rounded-lg border text-xs font-bold transition-colors ${seriesLimit === limit ? 'bg-amber-500/20 text-amber-500 border-amber-500/50 shadow-sm' : 'bg-app-base text-app-faint border-app-border hover:border-app-borderstrong'}`}>
+                        {limit === 0 ? 'Endlos' : limit}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[9px] text-app-faint leading-snug">Legt fest, nach wie vielen Runden das Spiel für die finale Abrechnung automatisch endet.</p>
+                </div>
+              </div>
+
+              <div className="space-y-2.5">
+                <h3 className="text-[10px] font-bold text-app-muted uppercase tracking-wider">Regeln & Finanzen</h3>
+                <div className="bg-app-element/50 p-3 rounded-xl border border-app-border space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <Banknote className="w-4 h-4 text-emerald-500"/>
+                        <span className="text-sm font-semibold text-app-text">Cent pro Punkt</span>
+                      </div>
+                      <input type="number" inputMode="decimal" step="0.5" min="0" value={centPerPoint} onChange={(e) => setCentPerPoint(Number(e.target.value))} className="w-20 block box-border bg-app-base border border-app-borderstrong rounded-lg px-3 py-1.5 text-sm text-right text-app-text focus:outline-none focus:border-amber-500" />
+                    </div>
+                    <p className="text-[9px] text-app-faint leading-snug">Berechnet am Ende automatisch die Auszahlung basierend auf den erspielten Punktedifferenzen.</p>
+                  </div>
+                  
+                  <div className="pt-3 border-t border-app-border">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <Banknote className="w-4 h-4 text-rose-500"/>
+                        <span className="text-sm font-semibold text-app-text">Verlustgeld (Kasse)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <input type="number" inputMode="decimal" step="0.10" min="0" value={penaltyPerLoss} onChange={(e) => setPenaltyPerLoss(Number(e.target.value))} className="w-20 block box-border bg-app-base border border-app-borderstrong rounded-lg px-3 py-1.5 text-sm text-right text-app-text focus:outline-none focus:border-amber-500" />
+                        <span className="text-sm font-semibold text-app-muted">€</span>
+                      </div>
+                    </div>
+                    <p className="text-[9px] text-app-faint leading-snug">Zahlung pro verlorenem Spiel in eine gemeinsame Kasse.</p>
+                  </div>
+
+                  <div className="pt-3 border-t border-app-border">
+                    <ToggleSetting label="Verlorenes Handspiel verdoppeln" active={ruleDoubleLostHand} onClick={() => setRuleDoubleLostHand(!ruleDoubleLostHand)} />
+                    <p className="text-[9px] text-app-faint mt-1 leading-snug">Nach ISkO werden verlorene Handspiele verdoppelt. In privaten Runden wird dies oft deaktiviert.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2.5">
+                <h3 className="text-[10px] font-bold text-app-muted uppercase tracking-wider flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-amber-500" /> Auto-Bockrunden (Je {players.length} Spiele)</h3>
+                <div className="bg-app-element/50 p-3 rounded-xl border border-app-border space-y-3">
+                  <p className="text-[9px] text-app-faint pb-2 border-b border-app-border leading-snug">Fügt beim jeweiligen Ereignis automatisch eine neue Bockrunde (Punkte x2) pro Spieler am Tisch hinzu.</p>
+                  <ToggleSetting label="Verlorenes Spiel" active={autoBockTriggers.lost} onClick={() => setAutoBockTriggers({...autoBockTriggers, lost: !autoBockTriggers.lost})} />
+                  <ToggleSetting label="Runde eingepasst" active={autoBockTriggers.passed} onClick={() => setAutoBockTriggers({...autoBockTriggers, passed: !autoBockTriggers.passed})} />
+                  <ToggleSetting label="Ramsch gespielt" active={autoBockTriggers.ramsch} onClick={() => setAutoBockTriggers({...autoBockTriggers, ramsch: !autoBockTriggers.ramsch})} />
+                  <ToggleSetting label="Kontra / Re / Hirsch" active={autoBockTriggers.kontra} onClick={() => setAutoBockTriggers({...autoBockTriggers, kontra: !autoBockTriggers.kontra})} />
+                  <ToggleSetting label="Grand Hand (Gewonnen)" active={autoBockTriggers.grandHand} onClick={() => setAutoBockTriggers({...autoBockTriggers, grandHand: !autoBockTriggers.grandHand})} />
+                </div>
+              </div>
+
+              <div className="space-y-2.5">
+                <h3 className="text-[10px] font-bold text-app-muted uppercase tracking-wider">Design & Anzeige</h3>
+                <div className="flex items-center justify-between bg-app-element/50 p-3 rounded-xl border border-app-border">
+                  <div className="flex items-center gap-2">
+                    {theme === 'dark' ? <Moon className="w-4 h-4 text-app-faint"/> : <Sun className="w-4 h-4 text-amber-500"/>}
+                    <span className="text-sm font-semibold text-app-text">Nachtmodus</span>
+                  </div>
+                  <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className={`w-12 h-6 rounded-full relative transition-colors ${theme === 'dark' ? 'bg-amber-500' : 'bg-app-borderstrong'}`}>
+                    <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${theme === 'dark' ? 'translate-x-7' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2.5">
+                <div className="flex justify-between items-baseline">
+                   <h3 className="text-[10px] font-bold text-app-muted uppercase tracking-wider">Spielernamen</h3>
+                   <span className="text-[9px] text-app-faint">Namen bearbeiten</span>
+                </div>
+                {players.map((p, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-app-faint w-5">{i + 1}.</span>
+                    <input type="text" value={p} onChange={(e) => updatePlayer(i, e.target.value)} className="w-full block box-border bg-app-base border border-app-border rounded-xl px-4 py-2.5 text-sm text-app-text focus:outline-none focus:border-amber-500" />
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-2"><button onClick={onClose} className="w-full py-3 rounded-xl text-sm font-bold bg-app-element text-app-text hover:bg-app-border flex justify-center items-center gap-1.5"><Check className="w-4 h-4 text-emerald-500" /><span>Speichern</span></button></div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      const activeData = LocalStore.get('skat_active');
+      const [isSetupPhase, setIsSetupPhase] = useState(() => !(activeData && activeData.players));
+      const [gameDate, setGameDate] = useState(() => activeData?.gameDate || new Date().toISOString().split('T')[0]);
+      const [players, setPlayers] = useState(() => activeData?.players || ['Spieler 1', 'Spieler 2', 'Spieler 3']);
+      const [scoringSystem, setScoringSystem] = useState(() => activeData?.scoringSystem || 'classic');
+      const [rounds, setRounds] = useState(() => activeData?.rounds || []);
+      const [seriesLimit, setSeriesLimit] = useState(() => activeData?.seriesLimit || 0);
+      const [eventMeta, setEventMeta] = useState(() => activeData?.eventMeta || { eventName: '', tableNumber: '', seriesNumber: '' });
+      const [pastSessions, setPastSessions] = useState(() => LocalStore.get('skat_history') || []);
+      
+      const [bockRounds, setBockRounds] = useState(() => activeData?.bockRounds || 0);
+      const [autoBockTriggers, setAutoBockTriggers] = useState(() => LocalStore.get('skat_autobock') || { lost: false, ramsch: false, kontra: false, grandHand: false, passed: false });
+
+      const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+      const [editingRound, setEditingRound] = useState(null);
+      const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+      const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+      const [statsView, setStatsView] = useState(null);
+      const [isProtocolOpen, setIsProtocolOpen] = useState(false);
+      const [protocolData, setProtocolData] = useState(null);
+      const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+      const [viewingHistorySession, setViewingHistorySession] = useState(null);
+      
+      const [theme, setTheme] = useState(() => LocalStore.get('skat_theme') || 'dark');
+      const [centPerPoint, setCentPerPoint] = useState(() => Number(LocalStore.get('skat_cents')) || 1);
+      const [penaltyPerLoss, setPenaltyPerLoss] = useState(() => Number(LocalStore.get('skat_penalty')) || 0);
+      const [ruleDoubleLostHand, setRuleDoubleLostHand] = useState(() => { const v = LocalStore.get('skat_rule_doublehand'); return v !== null ? v : true; });
+
+      const listEndRef = useRef(null);
+      useEffect(() => { if (listEndRef.current && !editingRound && !isProtocolOpen) listEndRef.current.scrollIntoView({ behavior: 'smooth' }); }, [rounds, editingRound, isProtocolOpen]);
+
+      useEffect(() => {
+        if (!isSetupPhase) LocalStore.set('skat_active', { gameDate, players, scoringSystem, rounds, bockRounds, seriesLimit, eventMeta });
+      }, [isSetupPhase, gameDate, players, scoringSystem, rounds, bockRounds, seriesLimit, eventMeta]);
+
+      useEffect(() => {
+        if (theme === 'dark') document.documentElement.classList.add('dark');
+        else document.documentElement.classList.remove('dark');
+        LocalStore.set('skat_theme', theme);
+      }, [theme]);
+
+      useEffect(() => { LocalStore.set('skat_cents', centPerPoint); }, [centPerPoint]);
+      useEffect(() => { LocalStore.set('skat_penalty', penaltyPerLoss); }, [penaltyPerLoss]);
+      useEffect(() => { LocalStore.set('skat_autobock', autoBockTriggers); }, [autoBockTriggers]);
+      useEffect(() => { LocalStore.set('skat_rule_doublehand', ruleDoubleLostHand); }, [ruleDoubleLostHand]);
+
+      const totals = useMemo(() => {
+        let t = new Array(players.length).fill(0);
+        rounds.forEach(r => r.scores.forEach((s, i) => t[i] += s));
+        return t;
+      }, [rounds, players.length]);
+
+      const history = useMemo(() => {
+        let running = new Array(players.length).fill(0);
+        return rounds.map(r => {
+          r.scores.forEach((s, i) => running[i] += s);
+          return { ...r, running: [...running] };
+        });
+      }, [rounds, players.length]);
+
+      const currentDealerIndex = useMemo(() => {
+        if (editingRound) return editingRound.dealerIndex;
+        if (rounds.length === 0) return 0;
+        return (rounds[rounds.length - 1].dealerIndex + 1) % players.length;
+      }, [rounds, players.length, editingRound]);
+
+      const handleFinishEvening = () => {
+        if (rounds.length === 0) return;
+        const newSession = { id: Date.now(), gameDate, players, scoringSystem, rounds, totals, seriesLimit, centPerPoint, penaltyPerLoss, eventMeta, bockRounds };
+        const newHist = [newSession, ...pastSessions];
+        setPastSessions(newHist);
+        LocalStore.set('skat_history', newHist);
+        setRounds([]); setBockRounds(0); setIsSetupPhase(true); LocalStore.remove('skat_active');
+        setIsSummaryOpen(false); setViewingHistorySession(newSession);
+      };
+
+      const handleRestoreSession = (session) => {
+        // Zustand wiederherstellen
+        setGameDate(session.gameDate);
+        setPlayers(session.players);
+        setScoringSystem(session.scoringSystem || 'classic');
+        setRounds(session.rounds);
+        setSeriesLimit(session.seriesLimit || 0);
+        setEventMeta(session.eventMeta || { eventName: '', tableNumber: '', seriesNumber: '' });
+        setCentPerPoint(session.centPerPoint || 1);
+        setPenaltyPerLoss(session.penaltyPerLoss || 0);
+        setBockRounds(session.bockRounds || 0);
+
+        // Aus Historie löschen, da es jetzt wieder das aktive Spiel ist
+        const newHist = pastSessions.filter(s => s.id !== session.id);
+        setPastSessions(newHist);
+        LocalStore.set('skat_history', newHist);
+
+        setIsSetupPhase(false);
+        setViewingHistorySession(null);
+        setIsHistoryOpen(false);
+      };
+
+      const handleSaveRound = (roundData, roundDetails) => {
+        const { declarerIndex, points, won, isPassed, isRamsch, isBock } = roundData;
+        const newScores = new Array(players.length).fill(0);
+        const thisRoundDealerIndex = editingRound ? editingRound.dealerIndex : currentDealerIndex;
+
+        let lossMultiplier = 2;
+        if (roundDetails?.hand && !ruleDoubleLostHand) lossMultiplier = 1;
+
+        if (!isPassed) {
+          if (isRamsch) {
+            newScores[declarerIndex] = -points;
+          } else {
+            const activeOpponents = players.map((_, i) => i).filter(i => i !== declarerIndex && (players.length === 3 || i !== thisRoundDealerIndex));
+            
+            if (scoringSystem === 'classic') {
+              newScores[declarerIndex] = won ? points : points * -lossMultiplier;
+            } else if (scoringSystem === 'seeger') {
+              if (won) {
+                newScores[declarerIndex] = points + 50;
+              } else {
+                newScores[declarerIndex] = (points * -lossMultiplier) - 50;
+                activeOpponents.forEach(i => newScores[i] = 40);
+              }
+            } else if (scoringSystem === 'bierlachs') {
+              if (won) {
+                activeOpponents.forEach(i => newScores[i] = -points);
+              } else {
+                newScores[declarerIndex] = points * -lossMultiplier;
+              }
+            }
+          }
+        }
+
+        const finalRoundData = {
+          id: editingRound ? editingRound.id : Date.now(),
+          dealerIndex: thisRoundDealerIndex,
+          declarerIndex, points, won, isPassed, isRamsch, isBock,
+          scores: newScores,
+          details: roundDetails
+        };
+
+        if (editingRound) {
+          setRounds(rounds.map(r => r.id === editingRound.id ? finalRoundData : r));
+        } else {
+          setRounds([...rounds, finalRoundData]);
+          
+          let currentBockRounds = bockRounds;
+          if (isBock && !isPassed) currentBockRounds = Math.max(0, currentBockRounds - 1);
+          
+          if (!isPassed) {
+            if (autoBockTriggers.lost && !won && !isRamsch) currentBockRounds += players.length;
+            if (autoBockTriggers.ramsch && isRamsch) currentBockRounds += players.length;
+            if (autoBockTriggers.kontra && roundDetails.kontra > 0) currentBockRounds += players.length;
+            if (autoBockTriggers.grandHand && roundDetails.gameType === 'suit' && roundDetails.suit?.id === 'grand' && roundDetails.hand && won) currentBockRounds += players.length;
+          } else {
+            if (autoBockTriggers.passed) currentBockRounds += players.length;
+          }
+          setBockRounds(currentBockRounds);
+        }
+        
+        if (navigator.vibrate) navigator.vibrate(40);
+        
+        setIsAddModalOpen(false); setEditingRound(null);
+      };
+
+      const handleDeleteRound = (id) => {
+        setRounds(rounds.filter(r => r.id !== id));
+        setIsAddModalOpen(false); setEditingRound(null);
+      };
+
+      const gridClass = players.length === 4 ? 'grid-cols-4' : 'grid-cols-3';
+      const isSeriesComplete = seriesLimit > 0 && rounds.length >= seriesLimit;
+
+      const getShortGameInfo = (round) => {
+        if (!round.details) return '';
+        if (round.details.mode === 'manual' && !round.isRamsch) return 'Manuell';
+        if (round.isRamsch) return '';
+        if (round.details.gameType === 'null') {
+           const l = round.details.nullType?.label || '';
+           return l === 'Einfach' ? 'Null' : `Null ${l}`;
+        }
+        if (round.details.gameType === 'suit') {
+           let info = round.details.suit?.label || '';
+           if (round.details.hand) {
+               info += ' Hand';
+           } else if (round.details.jacks) {
+               const m = round.details.jacks.c ? 'mit ' : 'ohne ';
+               info += ` ${m}${round.details.spitzen}`;
+           }
+           if (round.details.ansagen >= 3) info += ' Ouvert';
+           return info;
+        }
+        return '';
+      };
+
+      return (
+        <div className="h-full w-full bg-app-base text-app-text font-sans selection:bg-amber-500/30">
+          
+          {/* Main App Container - hidden when Protocol is open */}
+          <div className={`w-full h-full ${isProtocolOpen ? 'print:hidden hidden' : 'block'}`}>
+            {isSetupPhase ? (
+              <SetupScreen players={players} setPlayers={setPlayers} gameDate={gameDate} setGameDate={setGameDate} scoringSystem={scoringSystem} setScoringSystem={setScoringSystem} seriesLimit={seriesLimit} setSeriesLimit={setSeriesLimit} eventMeta={eventMeta} setEventMeta={setEventMeta} onStart={() => setIsSetupPhase(false)} onOpenHistory={() => setIsHistoryOpen(true)} theme={theme} setTheme={setTheme} />
+            ) : (
+              <div className="w-full h-full max-w-md mx-auto relative flex flex-col bg-app-panel sm:border-x border-app-border/50">
+                <header className="shrink-0 z-20 backdrop-blur-xl bg-app-panel/80 border-b border-app-border px-3 py-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-md shadow-amber-500/20 shrink-0">
+                      <ModernSkatLogo className="w-7 h-7 text-slate-950" />
+                    </div>
+                    <div className="flex flex-col">
+                      <h1 className="text-lg font-bold bg-gradient-to-r from-app-text to-app-muted bg-clip-text text-transparent leading-none">Skat Block</h1>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="text-[9px] text-amber-500 font-bold uppercase tracking-wider">{new Date(gameDate).toLocaleDateString('de-DE')}</span>
+                        <span className="text-[9px] text-app-faint">•</span>
+                        <span className="text-[9px] text-app-muted truncate max-w-[80px]">{SCORING_SYSTEMS.find(s => s.id === scoringSystem)?.short}</span>
+                        {seriesLimit > 0 && (
+                          <>
+                            <span className="text-[9px] text-app-faint">•</span>
+                            <span className={`text-[9px] font-bold px-1 rounded-sm ${isSeriesComplete ? 'bg-emerald-500/20 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                              {Math.min(rounds.length, seriesLimit)}/{seriesLimit}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-0.5">
+                    <button onClick={() => setIsHistoryOpen(true)} className="p-1.5 text-app-muted hover:text-amber-400 hover:bg-app-element rounded-full transition-colors"><Clock className="w-5 h-5" /></button>
+                    <button onClick={() => setStatsView({ stats: computePlayerStats(players, rounds), title: 'Aktuelle Runde', players, rounds })} className="p-1.5 text-app-muted hover:text-amber-400 hover:bg-app-element rounded-full transition-colors"><TrendingUp className="w-5 h-5" /></button>
+                    <button onClick={() => setIsSummaryOpen(true)} className="p-1.5 text-app-muted hover:text-amber-400 hover:bg-app-element rounded-full transition-colors"><BarChart2 className="w-5 h-5" /></button>
+                    <button onClick={() => setIsSettingsOpen(true)} className="p-1.5 text-app-muted hover:text-app-text hover:bg-app-element rounded-full transition-colors"><Settings className="w-5 h-5" /></button>
+                  </div>
+                </header>
+
+                {bockRounds > 0 && (
+                  <div className="shrink-0 bg-gradient-to-r from-amber-500/20 to-orange-500/10 border-b border-amber-500/30 px-3 py-1.5 flex items-center justify-center gap-2 text-amber-500 font-bold text-[10px] uppercase tracking-wider animate-in slide-in-from-top">
+                    <Zap className="w-3.5 h-3.5" />
+                    {bockRounds} Auto-Bockrunden verbleibend
+                  </div>
+                )}
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+                  <div className={`sticky top-0 z-10 grid ${gridClass} bg-app-panel/95 backdrop-blur shadow-sm border-b border-app-border`}>
+                    {players.map((p, i) => (
+                      <div key={i} className="px-1 py-2 text-center border-r border-app-border last:border-0 relative flex flex-col items-center justify-center">
+                        <div className="flex items-center justify-center gap-1 w-full px-1">
+                          <div className="text-[10px] font-semibold text-app-muted uppercase tracking-wider truncate mb-0.5">{p}</div>
+                          {currentDealerIndex === i && !isSeriesComplete && (
+                            <div className="bg-amber-500 text-slate-950 text-[8px] font-black px-1 rounded-sm shrink-0 mb-0.5" title="Geber">G</div>
+                          )}
+                        </div>
+                        <div className={`text-base sm:text-lg font-bold ${totals[i] < 0 ? 'text-rose-400' : totals[i] > 0 ? 'text-emerald-500' : 'text-app-text'}`}>{totals[i]}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="p-1.5 space-y-1 pb-24">
+                    {history.length === 0 ? (
+                      <div className="text-center py-10 text-app-faint flex flex-col items-center">
+                        <div className="w-12 h-12 rounded-full bg-app-element flex items-center justify-center mb-3 opacity-50"><Edit3 className="w-5 h-5" /></div>
+                        <p className="text-sm">Noch keine Spiele.</p>
+                      </div>
+                    ) : (
+                      history.map((round, idx) => (
+                        <div key={round.id} onClick={() => { setEditingRound(round); setIsAddModalOpen(true); }} className={`grid ${gridClass} bg-app-element/30 rounded-lg overflow-hidden group relative cursor-pointer active:bg-app-element/70 hover:bg-app-element/50 transition-colors`}>
+                          
+                          {round.isPassed && (
+                            <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                              <span className="bg-app-panel/90 text-app-muted text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full border border-app-borderstrong">Eingepasst</span>
+                            </div>
+                          )}
+
+                          {players.map((_, pIdx) => {
+                            const isDeclarer = round.declarerIndex === pIdx && !round.isPassed;
+                            const roundScore = round.scores[pIdx];
+                            const opacityClass = round.isPassed ? 'opacity-30' : 'opacity-100';
+                            
+                            return (
+                              <div key={pIdx} className={`py-2 px-1 text-center border-r border-app-border/50 last:border-0 flex flex-col justify-center relative ${isDeclarer ? (round.won ? 'bg-emerald-900/10' : 'bg-rose-900/10') : ''}`}>
+                                {isDeclarer && (
+                                  <div className={`absolute top-1 left-1 w-1.5 h-1.5 rounded-full ${round.isRamsch ? 'bg-amber-500/50' : (round.won ? 'bg-emerald-500/50' : 'bg-rose-500/50')}`} />
+                                )}
+                                <span className={`text-sm sm:text-base font-bold leading-tight ${opacityClass} ${round.running[pIdx] < 0 ? 'text-rose-400' : round.running[pIdx] > 0 ? 'text-emerald-500' : 'text-app-text'}`}>
+                                  {round.running[pIdx]}
+                                </span>
+                                
+                                <div className={`text-[9px] leading-tight flex flex-col items-center justify-center gap-0.5 mt-0.5 ${opacityClass} ${roundScore > 0 ? 'text-emerald-500' : roundScore < 0 ? 'text-rose-500' : 'text-app-faint'}`}>
+                                  <div className="flex items-center gap-0.5">
+                                    {roundScore !== 0 ? `${roundScore > 0 ? '+' : ''}${roundScore}` : '-'}
+                                    {isDeclarer && round.isBock && <span className="text-amber-400 font-bold ml-0.5">B</span>}
+                                    {isDeclarer && round.isRamsch && <span className="text-amber-400 font-bold ml-0.5">R</span>}
+                                    {isDeclarer && round.details?.kontra === 1 && <span className="text-rose-400 font-bold ml-0.5">K</span>}
+                                    {isDeclarer && round.details?.kontra === 2 && <span className="text-rose-400 font-bold ml-0.5">Re</span>}
+                                    {isDeclarer && round.details?.kontra === 3 && <span className="text-rose-400 font-bold ml-0.5">H</span>}
+                                  </div>
+                                  {isDeclarer && getShortGameInfo(round) && (
+                                    <div className="text-[7.5px] font-medium text-app-muted bg-app-element px-1.5 py-[1px] rounded border border-app-borderstrong/50 max-w-[95%] truncate leading-none mt-0.5">
+                                      {getShortGameInfo(round)}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))
+                    )}
+                    {history.length > 0 && !isSeriesComplete && (
+                      <div className="pt-6 pb-12 flex justify-center">
+                        <button onClick={handleFinishEvening} className="px-6 py-3 bg-app-element/80 text-emerald-500 font-bold rounded-2xl border border-app-borderstrong/50 hover:bg-app-border hover:text-emerald-600 transition-colors flex items-center gap-2 text-sm shadow-md active:scale-95"><Flag className="w-4 h-4" /><span>Abend beenden & Speichern</span></button>
+                      </div>
+                    )}
+                    <div ref={listEndRef} />
+                  </div>
+                </div>
+
+                <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center z-20 px-4 pointer-events-none gap-3">
+                  {history.length > 0 && !isSeriesComplete && (
+                    <button 
+                      onClick={() => { setEditingRound(rounds[rounds.length - 1]); setIsAddModalOpen(true); }}
+                      title="Letzte Runde korrigieren"
+                      className="pointer-events-auto w-12 h-12 bg-app-panel text-app-muted hover:text-amber-500 rounded-2xl shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center border border-app-borderstrong"
+                    >
+                      <RotateCcw className="w-5 h-5" />
+                    </button>
+                  )}
+                  
+                  {isSeriesComplete ? (
+                    <button onClick={() => setIsSummaryOpen(true)} className="pointer-events-auto flex-1 max-w-[260px] bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold py-3.5 rounded-2xl shadow-[0_8px_30px_rgb(16,185,129,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-sm animate-pulse">
+                      <Award className="w-5 h-5" /><span>Serie abschließen</span>
+                    </button>
+                  ) : (
+                    <button onClick={() => { setEditingRound(null); setIsAddModalOpen(true); }} className="pointer-events-auto flex-1 max-w-[260px] bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 font-bold py-3.5 rounded-2xl shadow-[0_8px_30px_rgb(245,158,11,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-sm">
+                      <Plus className="w-5 h-5" /><span>Neues Spiel</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* MODALS RENDER ORDER MATTERS FOR Z-INDEX (Rendered from bottom = Highest Z-Index) */}
+
+            {isHistoryOpen && (
+              <HistorySheet sessions={pastSessions} onClose={() => setIsHistoryOpen(false)} onViewSession={(s) => setViewingHistorySession(s)} />
+            )}
+
+            {isSummaryOpen && (
+              <SummarySheet players={players} totals={totals} rounds={rounds} gameDate={gameDate} eventMeta={eventMeta} scoringSystem={SCORING_SYSTEMS.find(s => s.id === scoringSystem)} seriesLimit={seriesLimit} onClose={() => setIsSummaryOpen(false)} onFinishEvening={handleFinishEvening} onReset={() => { setRounds([]); setBockRounds(0); setIsSummaryOpen(false); setIsSetupPhase(true); LocalStore.remove('skat_active'); }} viewMode="active" onOpenStats={() => setStatsView({ stats: computePlayerStats(players, rounds), title: 'Aktuelle Runde', players, rounds })} onOpenProtocol={() => { setProtocolData({ players, rounds, totals, gameDate, eventMeta, penaltyPerLoss, centPerPoint, scoringSystem: SCORING_SYSTEMS.find(s => s.id === scoringSystem), seriesLimit }); setIsProtocolOpen(true); }} centPerPoint={centPerPoint} penaltyPerLoss={penaltyPerLoss} />
+            )}
+
+            {viewingHistorySession && (
+              <SummarySheet players={viewingHistorySession.players} totals={viewingHistorySession.totals} rounds={viewingHistorySession.rounds} gameDate={viewingHistorySession.gameDate} eventMeta={viewingHistorySession.eventMeta} scoringSystem={SCORING_SYSTEMS.find(s => s.id === viewingHistorySession.scoringSystem)} seriesLimit={viewingHistorySession.seriesLimit || 0} onClose={() => setViewingHistorySession(null)} viewMode="history" onDeleteHistory={() => {
+                  const newHist = pastSessions.filter(s => s.id !== viewingHistorySession.id);
+                  setPastSessions(newHist); LocalStore.set('skat_history', newHist); setViewingHistorySession(null);
+                }} onOpenStats={() => setStatsView({ stats: computePlayerStats(viewingHistorySession.players, viewingHistorySession.rounds), title: `Statistik: ${new Date(viewingHistorySession.gameDate).toLocaleDateString('de-DE')}`, players: viewingHistorySession.players, rounds: viewingHistorySession.rounds })} onOpenProtocol={() => { setProtocolData({ players: viewingHistorySession.players, rounds: viewingHistorySession.rounds, totals: viewingHistorySession.totals, gameDate: viewingHistorySession.gameDate, eventMeta: viewingHistorySession.eventMeta, penaltyPerLoss: viewingHistorySession.penaltyPerLoss || penaltyPerLoss, centPerPoint: viewingHistorySession.centPerPoint || centPerPoint, scoringSystem: SCORING_SYSTEMS.find(s => s.id === viewingHistorySession.scoringSystem), seriesLimit: viewingHistorySession.seriesLimit || 0 }); setIsProtocolOpen(true); }} centPerPoint={viewingHistorySession.centPerPoint || centPerPoint} penaltyPerLoss={viewingHistorySession.penaltyPerLoss || penaltyPerLoss} onRestore={() => handleRestoreSession(viewingHistorySession)} hasActiveGame={rounds.length > 0} />
+            )}
+
+            {isAddModalOpen && (
+              <AddRoundSheet players={players} roundToEdit={editingRound} currentDealerIndex={currentDealerIndex} activeBockRounds={bockRounds} onClose={() => { setIsAddModalOpen(false); setEditingRound(null); }} onSave={handleSaveRound} onDelete={handleDeleteRound} />
+            )}
+
+            {isSettingsOpen && (
+              <SettingsSheet players={players} setPlayers={setPlayers} theme={theme} setTheme={setTheme} centPerPoint={centPerPoint} setCentPerPoint={setCentPerPoint} penaltyPerLoss={penaltyPerLoss} setPenaltyPerLoss={setPenaltyPerLoss} autoBockTriggers={autoBockTriggers} setAutoBockTriggers={setAutoBockTriggers} seriesLimit={seriesLimit} setSeriesLimit={setSeriesLimit} ruleDoubleLostHand={ruleDoubleLostHand} setRuleDoubleLostHand={setRuleDoubleLostHand} onClose={() => setIsSettingsOpen(false)} />
+            )}
+
+            {/* MUST BE AT THE BOTTOM SO IT RENDERS ON TOP OF SUMMARY/HISTORY */}
+            {statsView && (
+              <StatsSheet stats={statsView.stats} title={statsView.title} onClose={() => setStatsView(null)} players={statsView.players} rounds={statsView.rounds} />
+            )}
+          </div>
+          
+          {/* Protocol Sheet - Visible only when toggled, automatically adapts to @media print */}
+          {isProtocolOpen && protocolData && (
+             <ProtocolSheet 
+                players={protocolData.players} 
+                rounds={protocolData.rounds} 
+                totals={protocolData.totals} 
+                gameDate={protocolData.gameDate} 
+                eventMeta={protocolData.eventMeta}
+                penaltyPerLoss={protocolData.penaltyPerLoss}
+                centPerPoint={protocolData.centPerPoint}
+                scoringSystem={protocolData.scoringSystem}
+                seriesLimit={protocolData.seriesLimit}
+                onClose={() => setIsProtocolOpen(false)} 
+             />
+          )}
+          
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
