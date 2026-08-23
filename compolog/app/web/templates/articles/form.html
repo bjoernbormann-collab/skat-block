@@ -1,0 +1,214 @@
+{% extends "layout/base.html" %}
+{% block title %}{{ 'Artikel bearbeiten' if article else 'Neuer Artikel' }}{% endblock %}
+{% set values = form_values if form_values is defined else None %}
+{% macro val(field, fallback='') -%}
+{%- if values %}{{ values.get(field, '') }}{% elif article %}{{ (article[field] if article[field] is not none else '') }}{% else %}{{ fallback }}{% endif -%}
+{%- endmacro %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-5">{{ 'Artikel bearbeiten' if article else 'Neuer Artikel' }}</h1>
+
+{% if duplicates %}
+<div class="mb-4 rounded border border-amber-300 bg-amber-50 p-4">
+  <h2 class="font-semibold text-amber-900">Möglicher Doppelanlage-Fall</h2>
+  <p class="text-sm text-amber-900 mt-1">
+    Diese Artikel passen zu den eingegebenen Nummern. Prüfen Sie bitte, ob es
+    denselben Artikel schon gibt. Zwei verschiedene Teile können dieselbe
+    OE-Nummer tragen – deshalb wird hier nur gewarnt, nicht blockiert.
+  </p>
+  <ul class="mt-2 text-sm space-y-1">
+    {% for candidate in duplicates %}
+    <li>
+      <a href="/artikel/{{ candidate.article.id }}" target="_blank"
+         class="font-mono text-blue-800 hover:underline">{{ candidate.article.sku }}</a>
+      – {{ candidate.article.title }}
+      <span class="text-amber-800">({{ candidate.reason }}: {{ candidate.matched_value }})</span>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<form method="post" class="space-y-4"
+      action="{{ '/artikel/' ~ article.id ~ '/bearbeiten' if article else '/artikel/neu' }}">
+  {% if duplicates %}<input type="hidden" name="ignore_duplicates" value="1">{% endif %}
+
+  <section class="bg-white rounded-lg shadow p-5 grid gap-4 sm:grid-cols-2">
+    <h2 class="font-semibold sm:col-span-2">Stammdaten</h2>
+
+    <label class="sm:col-span-2">
+      <span class="block text-sm font-medium mb-1">Titel <span class="text-slate-400">(max. 80 Zeichen für eBay)</span></span>
+      <input name="title" maxlength="80" required value="{{ val('title') }}"
+             class="w-full rounded border border-slate-300 px-3 py-2">
+    </label>
+
+    <label><span class="block text-sm font-medium mb-1">Artikelnummer</span>
+      <input name="sku" value="{{ article.sku if article else '' }}" {% if article %}readonly{% endif %}
+             placeholder="wird automatisch vergeben"
+             class="w-full rounded border border-slate-300 px-3 py-2 font-mono {% if article %}bg-slate-100{% endif %}">
+    </label>
+    <label><span class="block text-sm font-medium mb-1">EAN/GTIN</span>
+      <input name="ean" value="{{ val('ean') }}" class="w-full rounded border border-slate-300 px-3 py-2"></label>
+    <label><span class="block text-sm font-medium mb-1">Herstellerteilenummer</span>
+      <input name="mpn" value="{{ val('mpn') }}" class="w-full rounded border border-slate-300 px-3 py-2 font-mono"></label>
+    <label><span class="block text-sm font-medium mb-1">Hersteller</span>
+      <select name="manufacturer_id" class="w-full rounded border border-slate-300 px-3 py-2">
+        <option value="">–</option>
+        {% for m in manufacturers %}
+        <option value="{{ m.id }}" {% if article and article.manufacturer_id == m.id %}selected{% endif %}>{{ m.name }}</option>
+        {% endfor %}
+      </select></label>
+
+    <label><span class="block text-sm font-medium mb-1">Warengruppe</span>
+      <select name="product_group_id" class="w-full rounded border border-slate-300 px-3 py-2">
+        <option value="">–</option>
+        {% for g in product_groups %}
+        <option value="{{ g.id }}" {% if article and article.product_group_id == g.id %}selected{% endif %}>{{ g.name }}</option>
+        {% endfor %}
+      </select></label>
+    <label><span class="block text-sm font-medium mb-1">Zustand</span>
+      <select name="condition" class="w-full rounded border border-slate-300 px-3 py-2">
+        {% for c in conditions %}
+        <option value="{{ c.value }}" {% if article and article.condition == c.value %}selected{% endif %}>
+          {{ {'new':'neu','used':'gebraucht','refurbished':'generalüberholt'}[c.value] }}</option>
+        {% endfor %}
+      </select></label>
+
+    <label class="sm:col-span-2"><span class="block text-sm font-medium mb-1">Kurzbeschreibung</span>
+      <input name="short_description" maxlength="255" value="{{ val('short_description') }}"
+             class="w-full rounded border border-slate-300 px-3 py-2"></label>
+    <label class="sm:col-span-2"><span class="block text-sm font-medium mb-1">Langbeschreibung (HTML erlaubt)</span>
+      <textarea name="long_description" rows="6"
+                class="w-full rounded border border-slate-300 px-3 py-2 font-mono text-sm">{{ val('long_description') }}</textarea></label>
+  </section>
+
+  <section class="bg-white rounded-lg shadow p-5 grid gap-4 sm:grid-cols-3">
+    <h2 class="font-semibold sm:col-span-3">Preise</h2>
+    <label><span class="block text-sm font-medium mb-1">Einkaufspreis netto</span>
+      <input name="purchase_price_net" inputmode="decimal" value="{{ val('purchase_price_net') }}"
+             class="w-full rounded border border-slate-300 px-3 py-2 text-right"></label>
+    <label><span class="block text-sm font-medium mb-1">Verkaufspreis brutto</span>
+      <input name="sales_price_gross" inputmode="decimal" value="{{ val('sales_price_gross') }}"
+             class="w-full rounded border border-slate-300 px-3 py-2 text-right"></label>
+    <label><span class="block text-sm font-medium mb-1">USt-Satz (%)</span>
+      <input name="vat_rate" inputmode="decimal"
+             value="{{ article.vat_rate if article else '19,00' }}"
+             class="w-full rounded border border-slate-300 px-3 py-2 text-right"></label>
+  </section>
+
+  <section class="bg-white rounded-lg shadow p-5 grid gap-4 sm:grid-cols-3">
+    <h2 class="font-semibold sm:col-span-3">Logistik &amp; Zoll</h2>
+    <label><span class="block text-sm font-medium mb-1">Gewicht (g)</span>
+      <input name="weight_gram" inputmode="decimal" value="{{ val('weight_gram') }}"
+             class="w-full rounded border border-slate-300 px-3 py-2 text-right"></label>
+    <label><span class="block text-sm font-medium mb-1">Verpackungseinheit</span>
+      <input name="packaging_unit" inputmode="decimal" value="{{ article.packaging_unit if article else '1' }}"
+             class="w-full rounded border border-slate-300 px-3 py-2 text-right"></label>
+    <label><span class="block text-sm font-medium mb-1">Mindestbestand</span>
+      <input name="min_stock" inputmode="decimal" value="{{ article.min_stock if article else '0' }}"
+             class="w-full rounded border border-slate-300 px-3 py-2 text-right"></label>
+    <label><span class="block text-sm font-medium mb-1">Länge (mm)</span>
+      <input name="length_mm" inputmode="decimal" value="{{ val('length_mm') }}"
+             class="w-full rounded border border-slate-300 px-3 py-2 text-right"></label>
+    <label><span class="block text-sm font-medium mb-1">Breite (mm)</span>
+      <input name="width_mm" inputmode="decimal" value="{{ val('width_mm') }}"
+             class="w-full rounded border border-slate-300 px-3 py-2 text-right"></label>
+    <label><span class="block text-sm font-medium mb-1">Höhe (mm)</span>
+      <input name="height_mm" inputmode="decimal" value="{{ val('height_mm') }}"
+             class="w-full rounded border border-slate-300 px-3 py-2 text-right"></label>
+    <label><span class="block text-sm font-medium mb-1">Zolltarifnummer</span>
+      <input name="hs_code" value="{{ val('hs_code') }}"
+             class="w-full rounded border border-slate-300 px-3 py-2 font-mono"></label>
+    <label><span class="block text-sm font-medium mb-1">Ursprungsland (ISO-2)</span>
+      <input name="country_of_origin" maxlength="2" value="{{ val('country_of_origin') }}"
+             class="w-full rounded border border-slate-300 px-3 py-2 uppercase"></label>
+  </section>
+
+  <section class="bg-white rounded-lg shadow p-5 grid gap-4 sm:grid-cols-2">
+    <h2 class="font-semibold sm:col-span-2">Beschaffung</h2>
+    <label><span class="block text-sm font-medium mb-1">Lieferant</span>
+      <select name="supplier_id" class="w-full rounded border border-slate-300 px-3 py-2">
+        <option value="">–</option>
+        {% for s in suppliers %}
+        <option value="{{ s.id }}" {% if article and article.supplier_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select></label>
+    <label><span class="block text-sm font-medium mb-1">Lieferanten-Artikelnummer</span>
+      <input name="supplier_sku" value="{{ val('supplier_sku') }}"
+             class="w-full rounded border border-slate-300 px-3 py-2 font-mono"></label>
+  </section>
+
+  <section class="bg-white rounded-lg shadow p-5 grid gap-4 sm:grid-cols-3">
+    <h2 class="font-semibold sm:col-span-3">Variante</h2>
+    <p class="text-xs text-slate-500 sm:col-span-3">
+      Bestand wird immer auf Kindebene geführt. Ein Elternartikel gruppiert nur.
+    </p>
+    <label><span class="block text-sm font-medium mb-1">Art</span>
+      <select name="kind" class="w-full rounded border border-slate-300 px-3 py-2">
+        {% for k in kinds %}
+        <option value="{{ k.value }}" {% if article and article.kind == k.value %}selected{% endif %}>
+          {{ {'standalone':'Einzelartikel','parent':'Elternartikel','child':'Variante'}[k.value] }}</option>
+        {% endfor %}
+      </select></label>
+    <label><span class="block text-sm font-medium mb-1">Elternartikel</span>
+      <select name="parent_id" class="w-full rounded border border-slate-300 px-3 py-2">
+        <option value="">–</option>
+        {% for p in parents %}
+        <option value="{{ p.id }}" {% if article and article.parent_id == p.id %}selected{% endif %}>{{ p.sku }} – {{ p.title }}</option>
+        {% endfor %}
+      </select></label>
+    <label><span class="block text-sm font-medium mb-1">Unterscheidungsmerkmale</span>
+      <input name="variant_axis" placeholder="pin_count,colour" value="{{ val('variant_axis') }}"
+             class="w-full rounded border border-slate-300 px-3 py-2 font-mono text-sm"></label>
+  </section>
+
+  <section class="bg-white rounded-lg shadow p-5">
+    <h2 class="font-semibold mb-3">OE-Nummern</h2>
+    <p class="text-xs text-slate-500 mb-2">Die erste Nummer gilt als Hauptnummer.</p>
+    <div class="grid gap-2">
+      {% set existing_oe = article.oe_numbers if article else [] %}
+      {% for index in range(10) %}
+      {% set link = existing_oe[index] if index < existing_oe|length else None %}
+      <div class="grid grid-cols-[2fr_1fr] gap-2">
+        <input name="oe_number_{{ index }}" placeholder="1J0 973 722" class="rounded border border-slate-300 px-3 py-2 font-mono"
+               value="{{ link.oe_number.number if link else '' }}">
+        <input name="oe_brand_{{ index }}" placeholder="Marke (VAG, BMW …)" class="rounded border border-slate-300 px-3 py-2"
+               value="{{ link.oe_number.brand if link else '' }}">
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="bg-white rounded-lg shadow p-5">
+    <h2 class="font-semibold mb-3">Querverweise (Wettbewerb)</h2>
+    <div class="grid gap-2">
+      {% set existing_xref = article.cross_references if article else [] %}
+      {% for index in range(5) %}
+      {% set ref = existing_xref[index] if index < existing_xref|length else None %}
+      <div class="grid grid-cols-3 gap-2">
+        <input name="xref_brand_{{ index }}" placeholder="Marke" class="rounded border border-slate-300 px-3 py-2"
+               value="{{ ref.brand if ref else '' }}">
+        <input name="xref_number_{{ index }}" placeholder="Nummer" class="rounded border border-slate-300 px-3 py-2 font-mono"
+               value="{{ ref.reference_number if ref else '' }}">
+        <input name="xref_note_{{ index }}" placeholder="Hinweis" class="rounded border border-slate-300 px-3 py-2"
+               value="{{ ref.note if ref else '' }}">
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="bg-white rounded-lg shadow p-5 space-y-3">
+    <label class="block"><span class="block text-sm font-medium mb-1">Interne Notiz</span>
+      <textarea name="internal_note" rows="3" class="w-full rounded border border-slate-300 px-3 py-2">{{ val('internal_note') }}</textarea></label>
+    <label class="flex items-center gap-2 text-sm">
+      <input type="checkbox" name="is_active" value="1" {% if not article or article.is_active %}checked{% endif %}>
+      Artikel ist aktiv
+    </label>
+  </section>
+
+  <div class="flex gap-2">
+    <button class="rounded bg-slate-900 text-white px-5 py-2.5 font-medium">Speichern</button>
+    <a href="{{ '/artikel/' ~ article.id if article else '/artikel' }}"
+       class="rounded border border-slate-300 bg-white px-5 py-2.5">Abbrechen</a>
+  </div>
+</form>
+{% endblock %}

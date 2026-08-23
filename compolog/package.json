@@ -1,0 +1,12 @@
+{
+  "name": "compolog-assets",
+  "private": true,
+  "description": "Only used to compile Tailwind. The application itself needs no Node.",
+  "scripts": {
+    "build:css": "tailwindcss -i app/web/static/css/input.css -o app/web/static/css/app.css --minify",
+    "watch:css": "tailwindcss -i app/web/static/css/input.css -o app/web/static/css/app.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.16"
+  }
+}

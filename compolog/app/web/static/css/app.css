@@ -1,0 +1,23 @@
+/* Custom rules only -- the utility classes come from Tailwind.
+   Keep this file small; anything expressible as a utility class belongs in the
+   template. */
+
+/* Touch targets on the picking views: the warehouse is operated with one thumb
+   and sometimes with gloves on. */
+@media (pointer: coarse) {
+  .pick-action { min-height: 3rem; font-size: 1.05rem; }
+}
+
+/* Stop iOS Safari zooming in when a form field is focused, which otherwise
+   throws the scan view off-centre on every tap. */
+@media (max-width: 640px) {
+  input, select, textarea { font-size: 16px; }
+}
+
+/* HTMX: show a busy state without a layout shift. */
+.htmx-request { opacity: 0.6; transition: opacity 120ms ease-in; }
+
+@media print {
+  header, footer, nav, .no-print { display: none !important; }
+  body { background: #fff; }
+}

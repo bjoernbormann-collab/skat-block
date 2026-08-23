@@ -1,0 +1,65 @@
+{# Result table. Rendered standalone for HTMX live search. #}
+{% if not articles %}
+<div class="bg-white rounded-lg shadow p-8 text-center text-slate-500">
+  Keine Artikel gefunden.
+  {% if q %}<br><span class="text-sm">Suchbegriff: „{{ q }}“</span>{% endif %}
+</div>
+{% else %}
+<div class="bg-white rounded-lg shadow overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead class="bg-slate-50 text-slate-600 text-left">
+      <tr>
+        <th class="p-2 w-14"></th>
+        <th class="p-2">Artikelnummer</th>
+        <th class="p-2">Titel</th>
+        <th class="p-2 hidden md:table-cell">MPN</th>
+        <th class="p-2 hidden lg:table-cell">Warengruppe</th>
+        <th class="p-2 text-right">VK brutto</th>
+        <th class="p-2 text-right hidden sm:table-cell">Min.</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for article in articles %}
+      {% set image = primary_image(article) %}
+      <tr class="border-t border-slate-100 hover:bg-slate-50">
+        <td class="p-2">
+          {% if image %}
+          <img src="/artikel/{{ article.id }}/bilder/{{ image.id }}/datei"
+               alt="" class="h-9 w-9 object-cover rounded border border-slate-200">
+          {% else %}
+          <div class="h-9 w-9 rounded bg-slate-100"></div>
+          {% endif %}
+        </td>
+        <td class="p-2 font-mono whitespace-nowrap">
+          <a href="/artikel/{{ article.id }}" class="text-blue-700 hover:underline">{{ article.sku }}</a>
+          {% if article.kind == 'parent' %}<span class="ml-1 text-xs bg-slate-200 rounded px-1">Eltern</span>{% endif %}
+          {% if article.kind == 'child' %}<span class="ml-1 text-xs bg-slate-100 rounded px-1">Variante</span>{% endif %}
+        </td>
+        <td class="p-2">
+          {{ article.title }}
+          {% if not article.is_active %}<span class="text-xs text-red-700 ml-1">(inaktiv)</span>{% endif %}
+        </td>
+        <td class="p-2 hidden md:table-cell font-mono text-slate-600">{{ article.mpn or '–' }}</td>
+        <td class="p-2 hidden lg:table-cell text-slate-600">{{ article.product_group.name if article.product_group else '–' }}</td>
+        <td class="p-2 text-right whitespace-nowrap">{{ article.sales_price_gross|euro }}</td>
+        <td class="p-2 text-right hidden sm:table-cell text-slate-600">{{ article.min_stock|number_de }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page_count > 1 %}
+<div class="flex items-center justify-center gap-2 mt-4 text-sm">
+  {% if page > 1 %}
+  <a href="/artikel?q={{ q|urlencode }}&seite={{ page - 1 }}"
+     class="rounded border border-slate-300 bg-white px-3 py-1.5">zurück</a>
+  {% endif %}
+  <span class="text-slate-500">Seite {{ page }} von {{ page_count }}</span>
+  {% if page < page_count %}
+  <a href="/artikel?q={{ q|urlencode }}&seite={{ page + 1 }}"
+     class="rounded border border-slate-300 bg-white px-3 py-1.5">weiter</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endif %}

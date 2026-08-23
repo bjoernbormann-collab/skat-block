@@ -1,0 +1,221 @@
+{% extends "layout/base.html" %}
+{% block title %}{{ article.sku }}{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-start gap-3 mb-5">
+  <div>
+    <div class="font-mono text-slate-500">{{ article.sku }}</div>
+    <h1 class="text-2xl font-semibold">{{ article.title }}</h1>
+    {% if not article.is_active %}
+    <span class="inline-block mt-1 text-xs bg-red-100 text-red-800 rounded px-2 py-0.5">inaktiv</span>
+    {% endif %}
+  </div>
+  <div class="ml-auto flex gap-2">
+    <a href="/artikel" class="rounded border border-slate-300 bg-white px-3 py-2 text-sm">Zurück</a>
+    <a href="/artikel/{{ article.id }}/bearbeiten"
+       class="rounded bg-slate-900 text-white px-3 py-2 text-sm">Bearbeiten</a>
+  </div>
+</div>
+
+<div class="grid gap-4 lg:grid-cols-3">
+  <div class="lg:col-span-2 space-y-4">
+
+    <section class="bg-white rounded-lg shadow p-5">
+      <h2 class="font-semibold mb-3">Stammdaten</h2>
+      <dl class="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+        {% macro row(label, value) %}
+        <div class="flex justify-between border-b border-slate-100 py-1">
+          <dt class="text-slate-500">{{ label }}</dt><dd class="text-right">{{ value }}</dd>
+        </div>
+        {% endmacro %}
+        {{ row('Hersteller', article.manufacturer.name if article.manufacturer else '–') }}
+        {{ row('Herstellerteilenr.', article.mpn or '–') }}
+        {{ row('EAN/GTIN', article.ean or '–') }}
+        {{ row('Warengruppe', article.product_group.name if article.product_group else '–') }}
+        {{ row('Zustand', {'new':'neu','used':'gebraucht','refurbished':'generalüberholt'}.get(article.condition, article.condition)) }}
+        {{ row('Lieferant', article.supplier.name if article.supplier else '–') }}
+        {{ row('Lieferanten-Nr.', article.supplier_sku or '–') }}
+        {{ row('Verpackungseinheit', article.packaging_unit|number_de(3)) }}
+        {{ row('Gewicht', (article.weight_gram|number_de(1) ~ ' g') if article.weight_gram else '–') }}
+        {{ row('Maße (L×B×H)', (article.length_mm|number_de(1) ~ ' × ' ~ article.width_mm|number_de(1) ~ ' × ' ~ article.height_mm|number_de(1) ~ ' mm') if article.length_mm else '–') }}
+        {{ row('Zolltarifnummer', article.hs_code or '–') }}
+        {{ row('Ursprungsland', article.country_of_origin or '–') }}
+        {{ row('Mindestbestand', article.min_stock|number_de(0)) }}
+      </dl>
+      {% if article.short_description %}
+      <p class="mt-4 text-sm text-slate-700">{{ article.short_description }}</p>
+      {% endif %}
+    </section>
+
+    <section class="bg-white rounded-lg shadow p-5">
+      <h2 class="font-semibold mb-3">OE-Nummern &amp; Querverweise</h2>
+      {% if article.oe_numbers %}
+      <div class="flex flex-wrap gap-2 mb-3">
+        {% for link in article.oe_numbers %}
+        <span class="rounded bg-slate-100 px-2 py-1 text-sm font-mono">
+          {{ link.oe_number.number }}
+          {% if link.oe_number.brand %}<span class="text-slate-500 text-xs">{{ link.oe_number.brand }}</span>{% endif %}
+          {% if link.is_primary %}<span class="text-xs text-blue-700">★</span>{% endif %}
+        </span>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-sm text-slate-500 mb-3">Keine OE-Nummern hinterlegt.</p>
+      {% endif %}
+
+      {% if article.cross_references %}
+      <table class="w-full text-sm">
+        <thead class="text-left text-slate-500"><tr><th class="py-1">Marke</th><th>Nummer</th><th>Hinweis</th></tr></thead>
+        <tbody>
+          {% for ref in article.cross_references %}
+          <tr class="border-t border-slate-100"><td class="py-1">{{ ref.brand }}</td>
+            <td class="font-mono">{{ ref.reference_number }}</td><td class="text-slate-600">{{ ref.note }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </section>
+
+    {% if article.attributes %}
+    <section class="bg-white rounded-lg shadow p-5">
+      <h2 class="font-semibold mb-3">Technische Daten</h2>
+      <dl class="grid sm:grid-cols-2 gap-x-6 text-sm">
+        {% for attr in article.attributes %}
+        <div class="flex justify-between border-b border-slate-100 py-1">
+          <dt class="text-slate-500">{{ attr.definition.label_de }}</dt>
+          <dd>{{ attr.value_text }} {{ attr.definition.unit }}</dd>
+        </div>
+        {% endfor %}
+      </dl>
+    </section>
+    {% endif %}
+
+    {% if article.fitments %}
+    <section class="bg-white rounded-lg shadow p-5">
+      <h2 class="font-semibold mb-3">Fahrzeugverwendung</h2>
+      <table class="w-full text-sm">
+        <thead class="text-left text-slate-500"><tr><th class="py-1">Fahrzeug</th><th>Baujahr</th><th>Hinweis</th></tr></thead>
+        <tbody>
+          {% for fit in article.fitments %}
+          <tr class="border-t border-slate-100">
+            <td class="py-1">{{ fit.vehicle.display_name }}</td>
+            <td class="whitespace-nowrap text-slate-600">
+              {{ fit.vehicle.year_from or '' }}{% if fit.vehicle.year_to %} – {{ fit.vehicle.year_to }}{% endif %}
+            </td>
+            <td class="text-slate-600">{{ fit.note }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endif %}
+
+    {% if article.kind == 'parent' and article.children %}
+    <section class="bg-white rounded-lg shadow p-5">
+      <h2 class="font-semibold mb-3">Varianten ({{ article.children|length }})</h2>
+      <p class="text-xs text-slate-500 mb-2">Bestand wird ausschließlich auf Variantenebene geführt.</p>
+      <ul class="text-sm space-y-1">
+        {% for child in article.children %}
+        <li><a href="/artikel/{{ child.id }}" class="text-blue-700 hover:underline font-mono">{{ child.sku }}</a>
+          <span class="text-slate-600">{{ child.title }}</span></li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+
+    <section class="bg-white rounded-lg shadow p-5">
+      <h2 class="font-semibold mb-3">Änderungshistorie</h2>
+      {% if history %}
+      <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="text-left text-slate-500">
+          <tr><th class="py-1">Zeitpunkt</th><th>Benutzer</th><th>Feld</th><th>vorher</th><th>nachher</th></tr>
+        </thead>
+        <tbody>
+          {% for entry in history %}
+          <tr class="border-t border-slate-100">
+            <td class="py-1 whitespace-nowrap text-slate-600">{{ entry.created_at|datetime_de }}</td>
+            <td class="text-slate-600">{{ entry.user.username if entry.user else entry.source }}</td>
+            <td>{{ entry.field_name or entry.action }}</td>
+            <td class="text-slate-500">{{ entry.old_value or '–' }}</td>
+            <td>{{ entry.new_value or '–' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% else %}
+      <p class="text-sm text-slate-500">Noch keine Änderungen erfasst.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="space-y-4">
+    <section class="bg-white rounded-lg shadow p-5">
+      <h2 class="font-semibold mb-3">Preise</h2>
+      <dl class="text-sm space-y-1">
+        <div class="flex justify-between"><dt class="text-slate-500">EK netto</dt><dd>{{ article.purchase_price_net|euro }}</dd></div>
+        <div class="flex justify-between"><dt class="text-slate-500">Ø Einstand</dt><dd>{{ article.average_cost_net|euro }}</dd></div>
+        <div class="flex justify-between"><dt class="text-slate-500">VK netto</dt><dd>{{ article.sales_price_net|euro }}</dd></div>
+        <div class="flex justify-between font-medium"><dt>VK brutto</dt><dd>{{ article.sales_price_gross|euro }}</dd></div>
+        <div class="flex justify-between"><dt class="text-slate-500">USt-Satz</dt><dd>{{ article.vat_rate|number_de(2) }} %</dd></div>
+        <div class="flex justify-between border-t border-slate-100 pt-1">
+          <dt class="text-slate-500">Rohertrag</dt>
+          <dd>{% if margin is not none %}{{ margin|number_de(2) }} %{% else %}<span class="text-slate-400">nicht berechenbar</span>{% endif %}</dd>
+        </div>
+      </dl>
+      {% if margin is none %}
+      <p class="text-xs text-slate-400 mt-2">Einkaufs- oder Verkaufspreis fehlt.</p>
+      {% endif %}
+    </section>
+
+    <section class="bg-white rounded-lg shadow p-5">
+      <h2 class="font-semibold mb-3">Bilder</h2>
+      {% if article.images %}
+      <div class="grid grid-cols-2 gap-2">
+        {% for image in article.images %}
+        <div class="relative border rounded overflow-hidden {% if image.is_primary %}border-blue-500 border-2{% else %}border-slate-200{% endif %}">
+          <img src="/artikel/{{ article.id }}/bilder/{{ image.id }}/datei" alt="{{ image.alt_text }}"
+               class="w-full h-24 object-cover">
+          <div class="flex text-xs">
+            {% if not image.is_primary %}
+            <form method="post" action="/artikel/{{ article.id }}/bilder/{{ image.id }}/hauptbild" class="flex-1">
+              <button class="w-full py-1 hover:bg-slate-100">Hauptbild</button>
+            </form>
+            {% else %}
+            <span class="flex-1 py-1 text-center text-blue-700">Hauptbild</span>
+            {% endif %}
+            <form method="post" action="/artikel/{{ article.id }}/bilder/{{ image.id }}/loeschen">
+              <button class="px-2 py-1 text-red-700 hover:bg-red-50">löschen</button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-sm text-slate-500 mb-3">Noch keine Bilder.</p>
+      {% endif %}
+
+      <form method="post" action="/artikel/{{ article.id }}/bilder"
+            enctype="multipart/form-data" class="mt-3 space-y-2">
+        <input type="file" name="bilder" multiple accept="image/*" class="w-full text-sm">
+        <button class="w-full rounded bg-slate-900 text-white py-2 text-sm">Hochladen</button>
+      </form>
+    </section>
+
+    <section class="bg-white rounded-lg shadow p-5">
+      <h2 class="font-semibold mb-2">Lagerbestand</h2>
+      <p class="text-sm text-slate-500">
+        Bestandsführung folgt mit Modul&nbsp;3. Bis dahin werden hier bewusst
+        keine Zahlen angezeigt.
+      </p>
+    </section>
+
+    {% if article.internal_note %}
+    <section class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+      <h2 class="font-semibold mb-1 text-sm">Interne Notiz</h2>
+      <p class="text-sm whitespace-pre-line">{{ article.internal_note }}</p>
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

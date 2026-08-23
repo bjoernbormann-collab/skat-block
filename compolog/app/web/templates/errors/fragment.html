@@ -1,0 +1,5 @@
+{# Returned for HTMX requests: a fragment, not a whole page. #}
+<div class="rounded border border-red-200 bg-red-50 text-red-800 px-3 py-2 text-sm">
+  <strong>{{ headline }}</strong> – {{ detail }}
+  {% if reference %}<span class="text-xs text-red-500">({{ reference }})</span>{% endif %}
+</div>
