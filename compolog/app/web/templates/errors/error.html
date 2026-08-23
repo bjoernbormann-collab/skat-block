@@ -1,0 +1,17 @@
+{% extends "layout/base.html" %}
+{% block title %}Fehler {{ code }}{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-lg mt-12 bg-white rounded-lg shadow p-6 text-center">
+  <div class="text-5xl font-bold text-slate-300">{{ code }}</div>
+  <h1 class="text-xl font-semibold mt-2">{{ headline }}</h1>
+  <p class="text-slate-600 mt-2">{{ detail }}</p>
+  {% if reference %}
+  <p class="text-xs text-slate-400 mt-4">
+    Referenz für die Fehlersuche: <code class="font-mono">{{ reference }}</code>
+  </p>
+  {% endif %}
+  <a href="/" class="inline-block mt-6 rounded bg-slate-900 text-white px-4 py-2 text-sm">
+    Zur Übersicht
+  </a>
+</div>
+{% endblock %}

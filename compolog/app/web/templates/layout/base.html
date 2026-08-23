@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="de" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ app_name }}{% endblock %} · {{ app_name }}</title>
+  {# Both libraries are vendored under /static, not pulled from a CDN: the Mac
+     mini has to keep working when the internet does not, and the warehouse view
+     runs on a phone with patchy reception.
+
+     tailwind.js is Tailwind's in-browser JIT build. It needs no toolchain, which
+     is why it is here, but it recompiles styles on every page load. See README
+     ("Tailwind produktiv bauen") for the switch to a compiled app.css once Node
+     is available. #}
+  <script src="/static/js/tailwind.js"></script>
+  <link rel="stylesheet" href="/static/css/app.css">
+  <script src="/static/js/htmx.min.js" defer></script>
+  <link rel="icon" href="/static/favicon.svg">
+</head>
+<body class="h-full bg-slate-100 text-slate-900">
+  {% if environment != 'production' or ebay_sandbox %}
+  <div class="bg-amber-400 text-amber-950 text-center text-sm py-1 font-medium">
+    {% if ebay_sandbox %}eBay-SANDBOX aktiv – es entstehen keine echten Angebote.{% else %}Entwicklungsmodus{% endif %}
+  </div>
+  {% endif %}
+
+  <div class="min-h-full flex flex-col">
+    {% if request.state.user is defined and request.state.user %}
+    <header class="bg-slate-900 text-slate-100">
+      <div class="mx-auto max-w-7xl px-4 py-3 flex items-center gap-4">
+        <a href="/" class="font-semibold tracking-tight text-lg">{{ app_name }}</a>
+        <nav class="hidden md:flex gap-1 text-sm">
+          {% for href, label in nav_items %}
+          <a href="{{ href }}"
+             class="px-3 py-1.5 rounded hover:bg-slate-700 {% if request.url.path == href %}bg-slate-700{% endif %}">{{ label }}</a>
+          {% endfor %}
+        </nav>
+        <div class="ml-auto flex items-center gap-3 text-sm">
+          <span class="hidden sm:inline text-slate-300">{{ request.state.user.username }}</span>
+          <form method="post" action="/logout">
+            <button class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600">Abmelden</button>
+          </form>
+        </div>
+      </div>
+      <nav class="md:hidden flex gap-1 overflow-x-auto px-4 pb-2 text-sm">
+        {% for href, label in nav_items %}
+        <a href="{{ href }}" class="whitespace-nowrap px-3 py-1.5 rounded bg-slate-800">{{ label }}</a>
+        {% endfor %}
+      </nav>
+    </header>
+    {% endif %}
+
+    <main class="flex-1">
+      <div class="mx-auto max-w-7xl px-4 py-6">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+
+    <footer class="border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+      {{ app_name }} · lokal betrieben
+    </footer>
+  </div>
+</body>
+</html>

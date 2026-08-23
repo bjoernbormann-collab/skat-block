@@ -1,0 +1,23 @@
+/* Source file for the compiled Tailwind build.
+   See README, "Tailwind produktiv bauen".
+
+   Building this into app.css replaces the in-browser JIT script; the custom
+   rules below are the same ones the hand-maintained app.css carries today. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  @media (pointer: coarse) {
+    .pick-action { min-height: 3rem; font-size: 1.05rem; }
+  }
+  @media (max-width: 640px) {
+    input, select, textarea { font-size: 16px; }
+  }
+  .htmx-request { opacity: 0.6; transition: opacity 120ms ease-in; }
+}
+
+@media print {
+  header, footer, nav, .no-print { display: none !important; }
+  body { background: #fff; }
+}

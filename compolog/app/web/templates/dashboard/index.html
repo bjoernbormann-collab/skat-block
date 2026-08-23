@@ -1,0 +1,38 @@
+{% extends "layout/base.html" %}
+{% block title %}Übersicht{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-6">Übersicht</h1>
+
+<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  {% macro tile(label, value, href=None, tone='slate') %}
+  <div class="bg-white rounded-lg shadow p-4">
+    <div class="text-sm text-slate-500">{{ label }}</div>
+    <div class="text-3xl font-semibold mt-1 text-{{ tone }}-800">{{ value }}</div>
+    {% if href %}<a href="{{ href }}" class="text-sm text-blue-700 hover:underline">öffnen →</a>{% endif %}
+  </div>
+  {% endmacro %}
+
+  {{ tile('Aktive Artikel', stats.articles_total) }}
+  {{ tile('Offene Bestellungen', stats.orders_open) }}
+  {{ tile('Klärfälle', stats.orders_clarification, tone='amber') }}
+  {{ tile('Fehlgeschlagene Sync-Jobs', stats.sync_failed, tone='red') }}
+</div>
+
+<div class="mt-8 bg-white rounded-lg shadow p-5">
+  <h2 class="font-semibold mb-2">Ausbaustand</h2>
+  <p class="text-sm text-slate-600 mb-3">
+    Diese Installation enthält bisher Schritt&nbsp;1 der Umsetzung: Datenmodell,
+    Migrationen, Anmeldung und Grundlayout. Die folgenden Bereiche sind bewusst
+    noch nicht angebunden – die Kacheln oben zeigen echte Werte, keine Platzhalter.
+  </p>
+  <ul class="text-sm text-slate-700 space-y-1">
+    <li>• Modul 1 – Artikelverwaltung / PIM <span class="text-slate-400">(offen)</span></li>
+    <li>• Modul 2 – eBay-Integration <span class="text-slate-400">(offen)</span></li>
+    <li>• Modul 3/4 – Lager und Aufträge <span class="text-slate-400">(offen)</span></li>
+    <li>• Modul 5 – Kommissionierung <span class="text-slate-400">(offen)</span></li>
+    <li>• Modul 6 – Belege <span class="text-slate-400">(Nummernkreise fertig, PDF offen)</span></li>
+    <li>• Modul 7 – Versand <span class="text-slate-400">(offen)</span></li>
+    <li>• Modul 8 – Auswertung <span class="text-slate-400">(offen)</span></li>
+  </ul>
+</div>
+{% endblock %}
