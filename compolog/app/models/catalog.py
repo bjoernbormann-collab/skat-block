@@ -28,6 +28,7 @@ from app.models.base import (
     Measure,
     Money,
     Percent,
+    Quantity,
     TimestampMixin,
 )
 from app.models.enums import ArticleCondition, ArticleKind
@@ -125,7 +126,9 @@ class Article(IdMixin, TimestampMixin, ActorMixin, Base):
     length_mm: Mapped[Decimal | None] = mapped_column(Measure(), nullable=True)
     width_mm: Mapped[Decimal | None] = mapped_column(Measure(), nullable=True)
     height_mm: Mapped[Decimal | None] = mapped_column(Measure(), nullable=True)
-    packaging_unit: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    # Base units per pack: 1 for loose parts, 25 for a 25 m ring of cable.
+    packaging_unit: Mapped[Decimal] = mapped_column(Quantity(), default=Decimal("1"),
+                                                    nullable=False)
     hs_code: Mapped[str] = mapped_column(String(16), default="", nullable=False)
     country_of_origin: Mapped[str] = mapped_column(String(2), default="", nullable=False)
 
@@ -155,7 +158,8 @@ class Article(IdMixin, TimestampMixin, ActorMixin, Base):
     )
 
     # ---------------------------------------------------------------- warehousing
-    min_stock: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    min_stock: Mapped[Decimal] = mapped_column(Quantity(), default=Decimal("0"),
+                                               nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     internal_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
 

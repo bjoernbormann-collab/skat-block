@@ -32,6 +32,7 @@ from app.models.base import (
     Base,
     IdMixin,
     Money,
+    Quantity,
     TimestampMixin,
     UtcDateTime,
 )
@@ -78,7 +79,8 @@ class StockLevel(IdMixin, TimestampMixin, Base):
     location_id: Mapped[int] = mapped_column(
         ForeignKey("storage_locations.id", ondelete="RESTRICT"), nullable=False
     )
-    quantity: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Quantity(), default=Decimal("0"),
+                                              nullable=False)
 
     article: Mapped["Article"] = relationship()  # noqa: F821
     location: Mapped[StorageLocation] = relationship()
@@ -110,10 +112,10 @@ class StockMovement(IdMixin, Base):
     )
     movement_type: Mapped[str] = mapped_column(String(24), nullable=False, index=True)
     # Signed: +5 goods receipt, -1 sale. Keeps SUM() over the journal meaningful.
-    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Quantity(), nullable=False)
     # Stock level at this location *after* this movement. Redundant on purpose:
     # it makes the journal auditable on its own, without replaying it.
-    quantity_after: Mapped[int] = mapped_column(Integer, nullable=False)
+    quantity_after: Mapped[Decimal] = mapped_column(Quantity(), nullable=False)
     # Net unit cost at the time of booking -- needed for the weighted average and
     # for valuing stock at a past date.
     unit_cost_net: Mapped[Decimal | None] = mapped_column(Money(), nullable=True)
@@ -149,7 +151,7 @@ class StockReservation(IdMixin, TimestampMixin, Base):
     order_line_id: Mapped[int | None] = mapped_column(
         ForeignKey("order_lines.id", ondelete="CASCADE"), nullable=True, index=True
     )
-    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Quantity(), nullable=False)
     status: Mapped[str] = mapped_column(
         String(16), default=ReservationStatus.OPEN.value, nullable=False
     )
@@ -194,9 +196,10 @@ class PurchaseOrderLine(IdMixin, TimestampMixin, Base):
     article_id: Mapped[int] = mapped_column(
         ForeignKey("articles.id", ondelete="RESTRICT"), nullable=False, index=True
     )
-    quantity_ordered: Mapped[int] = mapped_column(Integer, nullable=False)
+    quantity_ordered: Mapped[Decimal] = mapped_column(Quantity(), nullable=False)
     # Incremented by each goods receipt; partial deliveries just leave it short.
-    quantity_received: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    quantity_received: Mapped[Decimal] = mapped_column(Quantity(), default=Decimal("0"),
+                                                       nullable=False)
     unit_price_net: Mapped[Decimal] = mapped_column(Money(), nullable=False)
     note: Mapped[str] = mapped_column(String(255), default="", nullable=False)
 
@@ -204,8 +207,8 @@ class PurchaseOrderLine(IdMixin, TimestampMixin, Base):
     article: Mapped["Article"] = relationship()  # noqa: F821
 
     @property
-    def quantity_open(self) -> int:
-        return max(0, self.quantity_ordered - self.quantity_received)
+    def quantity_open(self) -> Decimal:
+        return max(Decimal("0"), self.quantity_ordered - self.quantity_received)
 
 
 class Stocktake(IdMixin, TimestampMixin, Base):
@@ -247,8 +250,8 @@ class StocktakeLine(IdMixin, TimestampMixin, Base):
     )
     # Snapshot taken when the count list was generated -- the difference must be
     # calculated against what the system believed *then*, not at closing time.
-    quantity_expected: Mapped[int] = mapped_column(Integer, nullable=False)
-    quantity_counted: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    quantity_expected: Mapped[Decimal] = mapped_column(Quantity(), nullable=False)
+    quantity_counted: Mapped[Decimal | None] = mapped_column(Quantity(), nullable=True)
     counted_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     counted_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
@@ -260,7 +263,7 @@ class StocktakeLine(IdMixin, TimestampMixin, Base):
     location: Mapped[StorageLocation] = relationship()
 
     @property
-    def difference(self) -> int | None:
+    def difference(self) -> Decimal | None:
         if self.quantity_counted is None:
             return None
         return self.quantity_counted - self.quantity_expected

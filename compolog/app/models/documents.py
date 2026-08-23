@@ -32,7 +32,15 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, IdMixin, Money, Percent, TimestampMixin, UtcDateTime
+from app.models.base import (
+    Base,
+    IdMixin,
+    Money,
+    Percent,
+    Quantity,
+    TimestampMixin,
+    UtcDateTime,
+)
 
 
 class NumberRange(IdMixin, TimestampMixin, Base):
@@ -162,7 +170,8 @@ class DocumentLine(IdMixin, TimestampMixin, Base):
     )
     sku: Mapped[str] = mapped_column(String(64), default="", nullable=False)
     description: Mapped[str] = mapped_column(String(500), default="", nullable=False)
-    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Quantity(), nullable=False)
+    # "Stk", "m", "Satz" -- printed on the document next to the quantity.
     unit: Mapped[str] = mapped_column(String(16), default="Stk", nullable=False)
     unit_price_net: Mapped[Decimal] = mapped_column(Money(), nullable=False)
     vat_rate: Mapped[Decimal] = mapped_column(Percent(), nullable=False)

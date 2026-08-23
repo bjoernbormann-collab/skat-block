@@ -81,6 +81,23 @@ def test_unknown_page_shows_the_german_error_page(client):
     assert "Traceback" not in response.text
 
 
+def test_error_page_renders_for_a_logged_in_user(client):
+    """Regression: the error page reads request.state.user after the request
+    session has been rolled back and closed. Handing templates the ORM object
+    made every friendly 400 explode into a 500 with a stack trace."""
+    _make_user("web-error", "ein-gutes-passwort")
+    client.post("/login", data={"username": "web-error",
+                                "password": "ein-gutes-passwort", "next": "/"},
+                follow_redirects=False)
+
+    response = client.get("/artikel/999999", headers={"accept": "text/html"})
+    assert response.status_code == 404
+    assert "Nicht gefunden" in response.text
+    assert "web-error" in response.text, "Kopfzeile muss weiter gerendert werden"
+    assert "Traceback" not in response.text
+    assert "DetachedInstance" not in response.text
+
+
 def test_session_cookie_is_httponly(client):
     _make_user("web-cookie", "ein-gutes-passwort")
     response = client.post("/login",

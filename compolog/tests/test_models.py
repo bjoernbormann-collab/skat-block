@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 from sqlalchemy import inspect, select
 from sqlalchemy.exc import IntegrityError
@@ -123,6 +125,45 @@ def test_stock_movement_journal_sums_to_the_running_total(db):
     ).all()
     assert sum(m.quantity for m in movements) == 45
     assert movements[-1].quantity_after == 45
+
+
+def test_fractional_quantities_are_supported(db):
+    """Cut goods (Kabel, Litze) -- the reason quantities are decimal, not int."""
+    article = Article(sku="CL-METER", title="Leitung FLRY 1,0 mm²",
+                      kind=ArticleKind.STANDALONE.value)
+    location = StorageLocation(code="B-02-01", name="Regal B Fach 2")
+    db.add_all([article, location])
+    db.flush()
+
+    db.add(StockMovement(
+        article_id=article.id, location_id=location.id,
+        movement_type=StockMovementType.GOODS_RECEIPT.value,
+        quantity=Decimal("25.000"), quantity_after=Decimal("25.000"),
+        booked_at=utcnow(),
+    ))
+    db.add(StockMovement(
+        article_id=article.id, location_id=location.id,
+        movement_type=StockMovementType.SALE.value,
+        quantity=Decimal("-2.500"), quantity_after=Decimal("22.500"),
+        booked_at=utcnow(),
+    ))
+    db.flush()
+
+    movements = db.scalars(
+        select(StockMovement).where(StockMovement.article_id == article.id)
+        .order_by(StockMovement.id)
+    ).all()
+    assert sum(m.quantity for m in movements) == Decimal("22.500")
+    assert movements[-1].quantity_after == Decimal("22.5")
+
+
+def test_quantity_precision_beyond_three_places_is_rejected(db):
+    """Three decimals is the contract; more is a rounding decision the caller
+    has to make explicitly."""
+    from app.models.base import Quantity
+
+    with pytest.raises(ValueError, match="decimal places"):
+        Quantity().process_bind_param(Decimal("1.0005"), None)
 
 
 def test_stock_movement_has_no_updated_at(db):

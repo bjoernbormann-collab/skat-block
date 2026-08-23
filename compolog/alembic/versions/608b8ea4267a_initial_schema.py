@@ -1,8 +1,8 @@
 """initial schema
 
-Revision ID: b78631f0a4ff
+Revision ID: 608b8ea4267a
 Revises: 
-Create Date: 2026-08-23 17:36:54.329433
+Create Date: 2026-08-23 17:55:36.322964
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = 'b78631f0a4ff'
+revision: str = '608b8ea4267a'
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -491,7 +491,7 @@ def upgrade() -> None:
     sa.Column('length_mm', sa.BigInteger(), nullable=True),
     sa.Column('width_mm', sa.BigInteger(), nullable=True),
     sa.Column('height_mm', sa.BigInteger(), nullable=True),
-    sa.Column('packaging_unit', sa.Integer(), nullable=False),
+    sa.Column('packaging_unit', sa.BigInteger(), nullable=False),
     sa.Column('hs_code', sa.String(length=16), nullable=False),
     sa.Column('country_of_origin', sa.String(length=2), nullable=False),
     sa.Column('purchase_price_net', sa.BigInteger(), nullable=True),
@@ -502,7 +502,7 @@ def upgrade() -> None:
     sa.Column('supplier_sku', sa.String(length=96), nullable=False),
     sa.Column('product_group_id', sa.Integer(), nullable=True),
     sa.Column('condition', sa.String(length=16), nullable=False),
-    sa.Column('min_stock', sa.Integer(), nullable=False),
+    sa.Column('min_stock', sa.BigInteger(), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('internal_note', sa.Text(), nullable=False),
     sa.Column('id', sa.Integer(), nullable=False),
@@ -838,14 +838,14 @@ def upgrade() -> None:
     sa.Column('article_id', sa.Integer(), nullable=True),
     sa.Column('sku', sa.String(length=64), nullable=False),
     sa.Column('title', sa.String(length=255), nullable=False),
-    sa.Column('quantity', sa.Integer(), nullable=False),
+    sa.Column('quantity', sa.BigInteger(), nullable=False),
     sa.Column('unit_price_gross', sa.BigInteger(), nullable=False),
     sa.Column('vat_rate', sa.BigInteger(), nullable=False),
     sa.Column('line_total_gross', sa.BigInteger(), nullable=False),
     sa.Column('unit_cost_net', sa.BigInteger(), nullable=True),
     sa.Column('channel_line_item_id', sa.String(length=64), nullable=False),
-    sa.Column('quantity_shipped', sa.Integer(), nullable=False),
-    sa.Column('quantity_returned', sa.Integer(), nullable=False),
+    sa.Column('quantity_shipped', sa.BigInteger(), nullable=False),
+    sa.Column('quantity_returned', sa.BigInteger(), nullable=False),
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
@@ -860,8 +860,8 @@ def upgrade() -> None:
     op.create_table('purchase_order_lines',
     sa.Column('purchase_order_id', sa.Integer(), nullable=False),
     sa.Column('article_id', sa.Integer(), nullable=False),
-    sa.Column('quantity_ordered', sa.Integer(), nullable=False),
-    sa.Column('quantity_received', sa.Integer(), nullable=False),
+    sa.Column('quantity_ordered', sa.BigInteger(), nullable=False),
+    sa.Column('quantity_received', sa.BigInteger(), nullable=False),
     sa.Column('unit_price_net', sa.BigInteger(), nullable=False),
     sa.Column('note', sa.String(length=255), nullable=False),
     sa.Column('id', sa.Integer(), nullable=False),
@@ -878,7 +878,7 @@ def upgrade() -> None:
     op.create_table('stock_levels',
     sa.Column('article_id', sa.Integer(), nullable=False),
     sa.Column('location_id', sa.Integer(), nullable=False),
-    sa.Column('quantity', sa.Integer(), nullable=False),
+    sa.Column('quantity', sa.BigInteger(), nullable=False),
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
@@ -895,8 +895,8 @@ def upgrade() -> None:
     sa.Column('article_id', sa.Integer(), nullable=False),
     sa.Column('location_id', sa.Integer(), nullable=False),
     sa.Column('movement_type', sa.String(length=24), nullable=False),
-    sa.Column('quantity', sa.Integer(), nullable=False),
-    sa.Column('quantity_after', sa.Integer(), nullable=False),
+    sa.Column('quantity', sa.BigInteger(), nullable=False),
+    sa.Column('quantity_after', sa.BigInteger(), nullable=False),
     sa.Column('unit_cost_net', sa.BigInteger(), nullable=True),
     sa.Column('booked_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('reason', sa.String(length=255), nullable=False),
@@ -920,8 +920,8 @@ def upgrade() -> None:
     sa.Column('stocktake_id', sa.Integer(), nullable=False),
     sa.Column('article_id', sa.Integer(), nullable=False),
     sa.Column('location_id', sa.Integer(), nullable=False),
-    sa.Column('quantity_expected', sa.Integer(), nullable=False),
-    sa.Column('quantity_counted', sa.Integer(), nullable=True),
+    sa.Column('quantity_expected', sa.BigInteger(), nullable=False),
+    sa.Column('quantity_counted', sa.BigInteger(), nullable=True),
     sa.Column('counted_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('counted_by_id', sa.Integer(), nullable=True),
     sa.Column('note', sa.String(length=255), nullable=False),
@@ -944,7 +944,7 @@ def upgrade() -> None:
     sa.Column('article_id', sa.Integer(), nullable=True),
     sa.Column('sku', sa.String(length=64), nullable=False),
     sa.Column('description', sa.String(length=500), nullable=False),
-    sa.Column('quantity', sa.Integer(), nullable=False),
+    sa.Column('quantity', sa.BigInteger(), nullable=False),
     sa.Column('unit', sa.String(length=16), nullable=False),
     sa.Column('unit_price_net', sa.BigInteger(), nullable=False),
     sa.Column('vat_rate', sa.BigInteger(), nullable=False),
@@ -967,8 +967,8 @@ def upgrade() -> None:
     sa.Column('order_line_id', sa.Integer(), nullable=False),
     sa.Column('article_id', sa.Integer(), nullable=False),
     sa.Column('location_id', sa.Integer(), nullable=True),
-    sa.Column('quantity_requested', sa.Integer(), nullable=False),
-    sa.Column('quantity_picked', sa.Integer(), nullable=False),
+    sa.Column('quantity_requested', sa.BigInteger(), nullable=False),
+    sa.Column('quantity_picked', sa.BigInteger(), nullable=False),
     sa.Column('status', sa.String(length=16), nullable=False),
     sa.Column('sort_order', sa.Integer(), nullable=False),
     sa.Column('scanned_code', sa.String(length=128), nullable=False),
@@ -995,7 +995,7 @@ def upgrade() -> None:
     op.create_table('return_lines',
     sa.Column('return_request_id', sa.Integer(), nullable=False),
     sa.Column('order_line_id', sa.Integer(), nullable=False),
-    sa.Column('quantity', sa.Integer(), nullable=False),
+    sa.Column('quantity', sa.BigInteger(), nullable=False),
     sa.Column('is_sellable', sa.Boolean(), nullable=False),
     sa.Column('condition_note', sa.String(length=255), nullable=False),
     sa.Column('id', sa.Integer(), nullable=False),
@@ -1011,7 +1011,7 @@ def upgrade() -> None:
     op.create_table('shipment_lines',
     sa.Column('shipment_id', sa.Integer(), nullable=False),
     sa.Column('order_line_id', sa.Integer(), nullable=False),
-    sa.Column('quantity', sa.Integer(), nullable=False),
+    sa.Column('quantity', sa.BigInteger(), nullable=False),
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
@@ -1025,7 +1025,7 @@ def upgrade() -> None:
     op.create_table('stock_reservations',
     sa.Column('article_id', sa.Integer(), nullable=False),
     sa.Column('order_line_id', sa.Integer(), nullable=True),
-    sa.Column('quantity', sa.Integer(), nullable=False),
+    sa.Column('quantity', sa.BigInteger(), nullable=False),
     sa.Column('status', sa.String(length=16), nullable=False),
     sa.Column('released_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('id', sa.Integer(), nullable=False),

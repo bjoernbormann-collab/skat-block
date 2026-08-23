@@ -106,6 +106,25 @@ def Measure(**kwargs: Any) -> ExactDecimal:
     return ExactDecimal(scale=3, **kwargs)
 
 
+def Quantity(**kwargs: Any) -> ExactDecimal:
+    """Stock quantity, three decimal places.
+
+    Connectors are counted in whole pieces, so an integer column would do today.
+    Decimal is used anyway because cut goods (Kabel, Schrumpfschlauch, Litze) are
+    expected later, and widening quantities afterwards means migrating the stock
+    journal, the reservations, every order and every issued document at once --
+    on live data, with a paper trail that must stay consistent.
+
+    Three decimals covers metres and grammes; more precision than that has no
+    meaning in a parts warehouse.
+
+    NOTE: this does NOT apply to the eBay mirror columns. eBay's Inventory API
+    takes an integer quantity, so ebay_listings keeps Integer and the client
+    rounds down at the boundary -- offering 2.7 m as 3 would oversell.
+    """
+    return ExactDecimal(scale=3, **kwargs)
+
+
 class UtcDateTime(TypeDecorator):
     """Timezone-aware DateTime that always stores and returns UTC."""
 

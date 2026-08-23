@@ -152,6 +152,11 @@ class EbayListing(IdMixin, TimestampMixin, Base):
     listing_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     # Last successfully pushed values -- the sync job's change detector.
+    #
+    # Quantities here stay Integer while the rest of the system uses decimals:
+    # eBay's Inventory API only accepts whole numbers, so these columns mirror
+    # what eBay actually holds. The client floors on the way out -- offering
+    # 2.7 m of cable as "3" would oversell.
     last_pushed_price: Mapped[Decimal | None] = mapped_column(Money(), nullable=True)
     last_pushed_quantity: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_pushed_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)

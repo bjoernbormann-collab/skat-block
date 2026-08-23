@@ -1,7 +1,7 @@
 # CompoLog – Datenmodell zur Freigabe
 
-Stand: Schritt 1 der Umsetzungsreihenfolge (Projektgerüst, Datenmodell,
-Migrationen, Auth, Grundlayout).
+Stand: Schritt 1 (Projektgerüst, Datenmodell, Migrationen, Auth, Grundlayout)
+und Schritt 2 (Modul 1 – Artikelverwaltung / PIM) sind umgesetzt.
 
 Das Modell deckt **alle acht Module** ab, nicht nur die bereits implementierten.
 Das ist Absicht: Alembic läuft ab dem ersten Commit, und ein Schema, das die
@@ -35,14 +35,24 @@ Migration bleibt ein Zeilenwechsel in der `.env`, keine Datenkonvertierung.
 **Zu entscheiden:** vier Nachkommastellen. Bei Nettopreisen einzelner Positionen
 sind zwei zu wenig (0,0825 € kommt bei Kleinteilen vor), vier reichen bequem.
 
-### 2. Mengen sind Ganzzahlen
+### 2. Mengen sind Dezimalzahlen mit drei Nachkommastellen
 
-Steckverbinder werden in Stück gehandelt. `packaging_unit` bildet die
-Verpackungseinheit ab (VE 10), gezählt wird trotzdem in ganzen Verkaufseinheiten.
+**Entschieden: Meterware kommt mittelfristig, also jetzt umgestellt.**
 
-**Konsequenz:** Meterware (Kabel, Schrumpfschlauch) passt so nicht ins Modell.
-Falls das kommen soll, sag Bescheid – dann werden die Mengenspalten jetzt auf
-`ExactDecimal(scale=3)` gestellt, und nicht später.
+Steckverbinder werden in Stück gehandelt – eine Ganzzahlspalte hätte heute
+gereicht. Dezimal trotzdem, weil Meterware (Kabel, Schrumpfschlauch, Litze)
+absehbar dazukommt und ein späteres Verbreitern bedeutet hätte, Bestandsjournal,
+Reservierungen, alle Bestellungen und alle ausgestellten Belege gleichzeitig zu
+migrieren – auf Echtdaten, mit einem Belegzusammenhang, der stimmen muss.
+
+Drei Nachkommastellen decken Meter und Gramm ab. `packaging_unit` bildet die
+Verpackungseinheit ab (1 lose, 25 für einen 25-m-Ring).
+
+**Eine Ausnahme, absichtlich:** `ebay_listings.last_pushed_quantity` und
+`channel_quantity` bleiben Ganzzahlen. Die eBay Inventory API nimmt nur ganze
+Zahlen, und der Client rundet an der Grenze **ab** – 2,7 m als „3" anzubieten
+wäre Überverkauf. Der Kommentar steht an der Spalte, damit das niemand
+„aufräumt".
 
 ### 3. Der Bestand ist ein unveränderliches Journal, der Bestandssatz nur Cache
 
@@ -356,32 +366,49 @@ die Differenz ist es wert, gesehen zu werden.
 
 ## Was schon läuft
 
+**Schritt 1 – Fundament**
 * Datenmodell und Migration (`alembic upgrade head` erzeugt alle 50 Tabellen)
-* Nummernkreise inkl. Transaktionssicherheit – 10 Tests
-* Anmeldung, Sessions, Sperre nach Fehlversuchen, zwei Rollen – 17 Tests
-* Exakte Dezimalarithmetik – 7 Tests
-* Änderungshistorie – 4 Tests
-* Backup inkl. Prüfsummen – 4 Tests
-* Modell-Invarianten – 10 Tests
-* Weboberfläche: Login, Dashboard, deutsche Fehlerseiten – 9 Tests
+* Nummernkreise inkl. Transaktionssicherheit
+* Anmeldung, Sessions, Sperre nach Fehlversuchen, zwei Rollen
+* Exakte Dezimalarithmetik, Änderungshistorie, Backup mit Prüfsummen
 * Strukturiertes JSON-Logging, getrennt nach Anwendung und API-Verkehr
 * APScheduler mit Backup- und Session-Aufräumjob
+* Deutsche Fehlerseiten, auch für HTMX-Fragmente
 
-**61 Tests, alle grün. Ruff sauber.**
+**Schritt 2 – Modul 1 (PIM)**
+* Artikel anlegen, bearbeiten, deaktivieren (nie löschen)
+* SKU-Vergabe aus dem Nummernkreis
+* Volltextsuche über SKU, Titel, MPN, EAN, OE-Nummer und Querverweis,
+  mit HTMX-Livesuche und Paginierung
+* Duplikaterkennung über normalisierte MPN und OE-Nummer – warnt, blockiert
+  nicht, und lässt sich bewusst übergehen
+* Varianten mit erzwungenen Regeln (Eltern trägt keinen Bestand, Kind braucht
+  Eltern, Eltern mit Kindern lässt sich nicht degradieren)
+* OE-Nummern und Querverweise, normalisiert und dedupliziert
+* Bilder: Upload, Hauptbild, Reihenfolge, Löschen; Format aus den Magic Bytes
+  statt aus dem Content-Type; Auslieferung nur an Angemeldete
+* Import XLSX/CSV mit Spaltenvorschlag, **Probelauf als Standard**,
+  Einzelfehler-Report je Zeile, Alles-oder-nichts bei Fehlern
+* Export XLSX/CSV, das sich unverändert wieder importieren lässt
+* Änderungshistorie je Feld, in der Detailansicht sichtbar
+
+**160 Tests, alle grün. Ruff sauber.**
 
 ## Was ausdrücklich noch nicht existiert
 
 Nichts davon ist als Platzhalter getarnt – die Tabellen sind da, die Logik nicht:
 
-* PIM-Oberfläche, Import/Export, Duplikaterkennung (Modul 1)
+* Technische Attribute und Fitment über die Oberfläche pflegen (Modell und
+  Anzeige stehen, das Bearbeitungsformular fehlt)
 * Der komplette eBay-Client (Modul 2)
-* Bestandsbuchungen, Wareneingang, Inventur (Modul 3)
+* Bestandsbuchungen, Wareneingang, Inventur (Modul 3) – die Artikeldetailseite
+  sagt das an der Stelle, wo sonst Zahlen stünden, ausdrücklich
 * Bestellimport, Status-Workflow, Retouren (Modul 4)
 * Picklisten, Scan-Ansicht (Modul 5)
 * PDF-Erzeugung, ZUGFeRD (Modul 6 – die Nummernkreise stehen bereits)
 * DHL-Anbindung (Modul 7)
 * Auswertungen, DATEV-Export (Modul 8)
 
-`app/scheduler.py` und `app/services/backup.py` kennzeichnen ihre Lücken im
-Code mit `STUB NOTICE` bzw. werfen `NotImplementedError` mit Klartext –
-PostgreSQL-Backup zum Beispiel ist bewusst nicht geraten.
+`app/scheduler.py` kennzeichnet seine Lücken mit `STUB NOTICE`;
+`app/services/backup.py` wirft für PostgreSQL `NotImplementedError` mit
+Klartext, statt still nichts zu tun.

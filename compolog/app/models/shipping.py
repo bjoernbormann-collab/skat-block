@@ -5,10 +5,18 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, IdMixin, Measure, Money, TimestampMixin, UtcDateTime
+from app.models.base import (
+    Base,
+    IdMixin,
+    Measure,
+    Money,
+    Quantity,
+    TimestampMixin,
+    UtcDateTime,
+)
 from app.models.enums import ShipmentStatus
 
 
@@ -101,7 +109,7 @@ class ShipmentLine(IdMixin, TimestampMixin, Base):
     order_line_id: Mapped[int] = mapped_column(
         ForeignKey("order_lines.id", ondelete="RESTRICT"), nullable=False
     )
-    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Quantity(), nullable=False)
 
     shipment: Mapped[Shipment] = relationship(back_populates="lines")
     order_line: Mapped["OrderLine"] = relationship()  # noqa: F821

@@ -5,9 +5,9 @@ Selbst gehostete Warenwirtschaft für den eBay-Handel mit Automotive-Steckverbin
 Läuft lokal auf einem Mac mini, optional per Cloudflare Tunnel vom iPhone
 erreichbar. Kein SaaS außer den APIs, die zwingend nötig sind (eBay, DHL).
 
-**Ausbaustand:** Schritt 1 der Umsetzungsreihenfolge ist fertig – Projektgerüst,
-vollständiges Datenmodell, Migrationen, Anmeldung, Grundlayout. Details und die
-Begründung der Modellentscheidungen stehen in [DATENMODELL.md](DATENMODELL.md).
+**Ausbaustand:** Schritt 1 (Fundament) und Schritt 2 (Modul 1 – Artikelverwaltung
+inklusive Import/Export) sind fertig. Details und die Begründung der
+Modellentscheidungen stehen in [DATENMODELL.md](DATENMODELL.md).
 
 ---
 
@@ -69,6 +69,11 @@ compolog/
 ├── alembic/              Migrationen (ab dem ersten Commit, keine Handarbeit am Schema)
 ├── app/
 │   ├── config.py         Settings-Klasse – alles aus .env, nichts hartkodiert
+│   ├── services/
+│   │   ├── numbering.py  lückenlose Nummernkreise (transaktionssicher)
+│   │   ├── articles.py   Artikellogik: SKU, Varianten, Duplikate, Suche
+│   │   ├── images.py     Bildablage auf der Platte
+│   │   └── importexport.py  XLSX/CSV mit Spaltenmapping
 │   ├── db.py             Engine, Session, SQLite-PRAGMAs
 │   ├── security.py       bcrypt, serverseitige Sessions, Login-Sperre
 │   ├── errors.py         deutsche Fehlerseiten, keine Stacktraces für Nutzer
@@ -76,7 +81,6 @@ compolog/
 │   ├── scheduler.py      APScheduler – Backup, Session-Aufräumen (eBay-Jobs folgen)
 │   ├── cli.py            Verwaltungsbefehle
 │   ├── models/           ORM, nach Modulen getrennt
-│   ├── services/         Geschäftslogik (numbering, audit, backup)
 │   └── web/              Routen, Jinja2-Templates, statische Dateien
 ├── data/                 Datenbank, Bilder, Belege, Backups, Logs (nicht im Git)
 └── tests/
@@ -153,10 +157,42 @@ entfernen. Die Warenhaus-Ansichten auf dem Handy danken es.
 
 ---
 
+## Artikelverwaltung (Modul 1)
+
+Unter **Artikel** liegen Suche, Anlage, Bearbeitung und Import/Export.
+
+* **Suche** geht über Artikelnummer, Titel, Herstellerteilenummer, EAN,
+  OE-Nummer und Querverweis. OE-Nummern werden normalisiert – „1J0 973 722"
+  findet auch „1J0973722" und umgekehrt.
+* **Doppelanlage** wird beim Speichern geprüft (MPN und OE-Nummer). Es wird
+  gewarnt, nicht blockiert: zwei verschiedene Teile können dieselbe OE-Nummer
+  tragen. Der Hinweis lässt sich mit einem Klick übergehen.
+* **Varianten**: ein Elternartikel gruppiert, Bestand läuft ausschließlich über
+  die Kinder. Die Regeln werden erzwungen, nicht nur dokumentiert.
+* **Bilder** werden am Dateiinhalt erkannt, nicht an der Endung, und nur an
+  angemeldete Nutzer ausgeliefert. Dasselbe Bild zweimal hochzuladen erzeugt
+  keinen zweiten Datensatz.
+* **Import**: XLSX oder CSV, Spalten werden anhand der Überschriften
+  vorgeschlagen. **Der erste Durchlauf ist immer ein Probelauf** – es wird
+  nichts gespeichert, bevor der Bericht auf dem Bildschirm stand. Schlägt auch
+  nur eine Zeile fehl, wird gar nichts übernommen; der Bericht nennt Zeile,
+  Artikelnummer und Grund.
+* **Export** erzeugt genau die Spaltenüberschriften, die der Import wieder
+  erkennt. Exportieren, in Excel korrigieren, reimportieren funktioniert also,
+  ohne dabei Felder zu verlieren.
+
+Warengruppen werden beim Import **nicht** automatisch angelegt: an einer
+Warengruppe hängen die eBay-Kategorie und die Angebotsvorlage, und ein Tippfehler
+würde Artikel erzeugen, die gut aussehen und sich nicht veröffentlichen lassen.
+Hersteller und Lieferanten werden dagegen bei Bedarf angelegt.
+
+Artikel werden **deaktiviert, nie gelöscht** – mit einem Artikel verschwänden
+sein Bestandsjournal und seine Auftragshistorie, und beide müssen lesbar bleiben.
+
 ## Tests
 
 ```bash
-pytest              # 61 Tests
+pytest              # 160 Tests
 pytest -q --tb=short
 ```
 
@@ -166,7 +202,9 @@ scheitern – genau der Fehler, der sonst erst auf der Produktivmaschine auffäl
 
 Getestet werden bisher: Nummernkreise (inkl. Rollback-Verhalten), exakte
 Dezimalarithmetik, Passwort- und Session-Handling, Änderungshistorie,
-Backup-Integrität, Modell-Invarianten und der Anmelde-Ablauf über HTTP.
+Backup-Integrität, Modell-Invarianten, der Artikelservice (SKU-Vergabe,
+Variantenregeln, Duplikaterkennung, Suche, Marge), Import und Export
+einschließlich Rundlauf, Bildverwaltung sowie die Weboberfläche über HTTP.
 
 ---
 

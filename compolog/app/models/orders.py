@@ -21,14 +21,21 @@ from sqlalchemy import (
     Boolean,
     ForeignKey,
     Index,
-    Integer,
     String,
     Text,
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, IdMixin, Money, Percent, TimestampMixin, UtcDateTime
+from app.models.base import (
+    Base,
+    IdMixin,
+    Money,
+    Percent,
+    Quantity,
+    TimestampMixin,
+    UtcDateTime,
+)
 from app.models.enums import (
     OrderStatus,
     PaymentStatus,
@@ -217,7 +224,7 @@ class OrderLine(IdMixin, TimestampMixin, Base):
     # Snapshot of what was sold, independent of later PIM edits.
     sku: Mapped[str] = mapped_column(String(64), default="", nullable=False)
     title: Mapped[str] = mapped_column(String(255), default="", nullable=False)
-    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Quantity(), nullable=False)
     unit_price_gross: Mapped[Decimal] = mapped_column(Money(), nullable=False)
     vat_rate: Mapped[Decimal] = mapped_column(Percent(), default=Decimal("19.00"),
                                               nullable=False)
@@ -226,8 +233,10 @@ class OrderLine(IdMixin, TimestampMixin, Base):
     # not silently change when the average purchase price moves.
     unit_cost_net: Mapped[Decimal | None] = mapped_column(Money(), nullable=True)
     channel_line_item_id: Mapped[str] = mapped_column(String(64), default="", nullable=False)
-    quantity_shipped: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    quantity_returned: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    quantity_shipped: Mapped[Decimal] = mapped_column(Quantity(), default=Decimal("0"),
+                                                      nullable=False)
+    quantity_returned: Mapped[Decimal] = mapped_column(Quantity(), default=Decimal("0"),
+                                                       nullable=False)
 
     order: Mapped[Order] = relationship(back_populates="lines")
     article: Mapped["Article | None"] = relationship()  # noqa: F821
@@ -269,7 +278,7 @@ class ReturnLine(IdMixin, TimestampMixin, Base):
     order_line_id: Mapped[int] = mapped_column(
         ForeignKey("order_lines.id", ondelete="RESTRICT"), nullable=False
     )
-    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Quantity(), nullable=False)
     # Sellable again, or scrap? Decides whether stock is booked back at all.
     is_sellable: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     condition_note: Mapped[str] = mapped_column(String(255), default="", nullable=False)

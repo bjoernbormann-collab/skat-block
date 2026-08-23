@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, IdMixin, TimestampMixin, UtcDateTime
+from app.models.base import Base, IdMixin, Quantity, TimestampMixin, UtcDateTime
 from app.models.enums import PickLineStatus, PickListStatus
 
 
@@ -78,8 +79,9 @@ class PickLine(IdMixin, TimestampMixin, Base):
     location_id: Mapped[int | None] = mapped_column(
         ForeignKey("storage_locations.id", ondelete="SET NULL"), nullable=True
     )
-    quantity_requested: Mapped[int] = mapped_column(Integer, nullable=False)
-    quantity_picked: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    quantity_requested: Mapped[Decimal] = mapped_column(Quantity(), nullable=False)
+    quantity_picked: Mapped[Decimal] = mapped_column(Quantity(), default=Decimal("0"),
+                                                     nullable=False)
     status: Mapped[str] = mapped_column(
         String(16), default=PickLineStatus.OPEN.value, nullable=False, index=True
     )
@@ -98,5 +100,5 @@ class PickLine(IdMixin, TimestampMixin, Base):
     order_line: Mapped["OrderLine"] = relationship()  # noqa: F821
 
     @property
-    def quantity_open(self) -> int:
-        return max(0, self.quantity_requested - self.quantity_picked)
+    def quantity_open(self) -> Decimal:
+        return max(Decimal("0"), self.quantity_requested - self.quantity_picked)

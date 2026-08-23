@@ -13,7 +13,7 @@ from app import scheduler
 from app.config import settings
 from app.errors import register_error_handlers
 from app.logging_config import get_logger, setup_logging
-from app.web import routes_auth, routes_dashboard
+from app.web import routes_articles, routes_auth, routes_dashboard
 from app.web.templating import templates
 
 logger = get_logger("app")
@@ -22,6 +22,7 @@ logger = get_logger("app")
 # menu never links to a page that does not exist yet.
 NAV_ITEMS: list[tuple[str, str]] = [
     ("/", "Übersicht"),
+    ("/artikel", "Artikel"),
 ]
 
 
@@ -76,6 +77,7 @@ def create_app() -> FastAPI:
 
     app.include_router(routes_auth.router)
     app.include_router(routes_dashboard.router)
+    app.include_router(routes_articles.router)
     return app
 
 
