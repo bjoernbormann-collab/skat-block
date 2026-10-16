@@ -1,0 +1,43 @@
+# 24/7 crypto trading agent: BRAIN / REFLEX split
+
+**Status: REFLEX layer built and tested (9 tests). Paper trading only. Research layer, live data, and live execution are NOT built.**
+
+## Architecture
+- **BRAIN (slow, Opus-class):** regime research, strategy derivation, backtests, overnight review, escalations. Not implemented here; it needs live data and sources.
+- **REFLEX (fast, Jev):** per-candle decision. Jev fills a typed schema (`reflex/schema.py`). Code decides everything else.
+- The model proposes. Deterministic code gates, sizes, and risk-checks. The model cannot override risk.
+
+## Code map (`reflex/`)
+| File | Role |
+|---|---|
+| `schema.py` | Strict Jev schema; malformed output raises, caller holds |
+| `state.py` | Order book -> compact snapshot (<500 tokens), causal timestamps only |
+| `calibration.py` | Brier score + binned recalibration; trusts Jev only downward, shrinks when data is thin |
+| `sizing.py` | Quarter-Kelly from calibrated p |
+| `risk.py` | 15% max drawdown, position cap, daily loss, latched kill switch (human reset) |
+| `gate.py` | fire only if: no toxic flow, setup_quality>=2, calibrated p>0.80, risk_state ok; escalate if conf<0.60 or crisis |
+| `execution.py` | Paper broker. Live path intentionally absent |
+
+Run: `python3 -m unittest discover -s tests -v`
+
+## Six build phases (spec -> architecture -> test-first -> review -> ship -> approval gate)
+1. **Spec:** done in this README + schema. Open: universe, venue, daily-loss limit, latency budget.
+2. **Architecture:** adapters for exchange feed, LLM client, store. Put AgentKit/Jev behind these interfaces once their docs are verified.
+3. **Test-first:** done for REFLEX. Next: replay harness over recorded books, property tests on the risk layer.
+4. **Review:** adversarial review of the gate and kill switch; add a staleness check (reject snapshots older than N ms).
+5. **Ship (paper):** run >= 4 weeks paper with fees, slippage, and latency modelled. Log every Jev output and outcome.
+6. **Approval gate:** the operator approves live only after calibration (Brier) and drawdown criteria are met, in writing, with a small capital cap.
+
+## Self-improvement loop (nightly, not implemented)
+Replay session -> per-fill and per-miss attribution -> Brier by regime -> propose schema/prompt changes -> re-run backtest -> operator approves before deploy. Never auto-deploy changes to risk limits.
+
+## WHAT COULD I BE WRONG ABOUT?
+1. **There may be no edge.** Nothing here shows the strategy makes money. Most retail crypto automation loses after fees; "looks profitable" in a backtest is the default outcome of overfitting.
+2. **The 0.80 gate is arbitrary.** It is only meaningful if Jev's confidence is calibrated, and LLM probabilities usually are not. The calibrator guards against this but needs a few hundred outcomes per bin first. Until then the agent will mostly hold, by design.
+3. **Kelly overbets on noisy p.** Quarter Kelly helps, but p-estimation error dominates. Treat sizing as an upper bound.
+4. **Catalyst already priced in** is a research question I did not answer. No asymmetric-setup list was produced because I did not run live, dated, sourced research and won't invent one.
+5. **Value accrual to tokens, incentive-driven edge:** unexamined; belongs to the BRAIN phase with primary sources.
+6. **Latency:** ~81 ms for a hosted LLM call per candle is a claim from the prompt I could not verify. Exchange rate limits, outages, and stale data can break the "reflex" assumption. Add stale-snapshot rejection.
+7. **Tail risk:** a 15% drawdown limit cannot stop gap moves, exchange failure, API key compromise, or liquidation cascades. Use exchange-side stops, withdrawal-restricted keys, and tiny initial capital.
+8. **Hard limits live in code, but only if every order path goes through `gate.decide`.** Enforce that structurally at the execution adapter.
+9. Third-party services named in the brief (agentkit.xyz, console.typesafe.ai) were not verified or integrated.
