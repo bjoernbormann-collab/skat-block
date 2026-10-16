@@ -1,6 +1,6 @@
 # 24/7 crypto trading agent: BRAIN / REFLEX split
 
-**Status: REFLEX layer and offline replay harness built and tested (22 tests, paper loop, Jev interface, BRAIN research v0, real-data loader, walk-forward, order-book recorder). Paper trading only. Research layer, live data, and live execution are NOT built.**
+**Status: REFLEX layer and offline replay harness built and tested (27 tests, go/no-go evaluation, paper loop, Jev interface, BRAIN research v0, real-data loader, walk-forward, order-book recorder). Paper trading only. Research layer, live data, and live execution are NOT built.**
 
 ## Architecture
 - **BRAIN (slow, Opus-class):** regime research, strategy derivation, backtests, overnight review, escalations. Not implemented here; it needs live data and sources.
@@ -37,6 +37,12 @@ python3 tools/run_paper.py --jev claude --interval 300   # Claude Haiku 5.5 as J
 Auto-start and restart after crash/reboot: `deploy/com.tradingagent.paper.plist` (launchd; instructions in the file).
 `reflex/jev.py` holds the Jev interface: any object with `decide(state) -> dict` works, so a different model can replace Claude without touching gate, risk, or sizing. Any Jev error, refusal, or malformed output means HOLD.
 **Not yet verified:** `ClaudeJev` has unit-level syntax checks only; it has not been run against the live API (no key in the build environment). Run it once on the Mac mini and check `data/paper_log.jsonl` for `jev_error` entries.
+
+## Go/no-go evaluation (`tools/evaluate_paper.py`)
+Reads the paper log and applies criteria fixed in advance: >= 28 days, >= 100 closed trades, mean net return per trade > 0, t >= 2, max drawdown <= 10%, Jev error rate <= 5%, Brier < 0.25 (coin flip), kill switch never tripped. Verdicts: NOT ENOUGH DATA / STOP / CANDIDATE. Full setup guide: `SETUP_MAC_MINI.md`.
+
+## Deliberately NOT built: live order execution
+There is no code path that sends a real order. Adding one belongs after a CANDIDATE verdict, behind an explicit operator approval flag, with withdrawal-restricted keys and a tiny capital cap.
 
 ## BRAIN v0 (`brain/`)
 - `python3 -m brain.market_report`: live regime snapshot (Kraken, CoinGecko, DefiLlama, Fear&Greed), sources and timestamps on every figure, failures shown as UNAVAILABLE. Latest: `research/market_snapshot.md`.

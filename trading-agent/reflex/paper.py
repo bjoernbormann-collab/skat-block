@@ -51,13 +51,18 @@ class PaperEngine:
         # resolve shadow signals (calibration: every signal is scored, traded or not)
         for s in [x for x in self.shadow if x[0] <= now]:
             if s[1] != "neutral":
-                self.cal.update(s[3], 1 if (mid > s[2]) == (s[1] == "long") else 0)
+                ok = 1 if (mid > s[2]) == (s[1] == "long") else 0
+                self.cal.update(s[3], ok)
+                self._log({"event": "shadow", "ts": now, "conf": s[3], "dir": s[1], "correct": ok})
             self.shadow.remove(s)
         # close due position
         if self.pos and now >= self.pos["exit_ts"]:
             sgn = 1 if self.pos["side"] == "long" else -1
             ret = sgn * (mid * (1 - sgn * self.broker.slip / 1e4) / self.pos["entry"] - 1)
+            net = ret - self.broker.fee / 1e4 * 2                      # entry + exit fee
             self.broker.equity += self.pos["notional"] * ret - self.pos["notional"] * self.broker.fee / 1e4
+            self._log({"event": "trade_closed", "ts": now, "side": self.pos["side"], "net_ret": net,
+                       "notional": self.pos["notional"]})
             self.pos, self.closed = None, self.closed + 1
             self.peak = max(self.peak, self.broker.equity)
         book.position = (self.pos["notional"] if self.pos and self.pos["side"] == "long" else
