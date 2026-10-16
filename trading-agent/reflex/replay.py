@@ -35,6 +35,7 @@ def run(prices, signal, *, equity=100_000.0, horizon=5, fee_bps=6.0, slip_bps=3.
     pending = []          # (exit_t, side, entry_px, notional, raw_conf)
     preds, outs, trades, wins, maxdd = [], [], 0, 0, 0.0
     busy_until = -1
+    shadow = []           # (exit_t, direction, entry_px, raw_conf): every signal, traded or not
     for t in range(warmup, len(prices)):
         for item in [x for x in pending if x[0] == t]:      # resolve trades whose horizon ended
             _, side, ent, notional, conf = item
@@ -42,15 +43,23 @@ def run(prices, signal, *, equity=100_000.0, horizon=5, fee_bps=6.0, slip_bps=3.
             ret = sgn * (prices[t] * (1 - sgn * slip_bps / 1e4) / ent - 1)
             eq += notional * ret - notional * fee_bps / 1e4
             win = 1 if ret > 0 else 0
-            wins += win; preds.append(conf); outs.append(win); cal.update(conf, win)
+            wins += win; preds.append(conf); outs.append(win)
             pending.remove(item)
             peak = max(peak, eq); maxdd = max(maxdd, (peak - eq) / peak)
-        if t <= busy_until or t + horizon >= len(prices):
+        for item in [x for x in shadow if x[0] == t]:        # shadow calibration, resolved causally
+            _, dr, ent0, conf0 = item
+            if dr != "neutral":
+                cal.update(conf0, 1 if (prices[t] > ent0) == (dr == "long") else 0)
+            shadow.remove(item)
+        if t + horizon >= len(prices):
             continue
         try:
             j = JevDecision.parse(signal(prices[:t + 1], t))
         except Exception:
             continue                                         # malformed -> hold
+        shadow.append((t + horizon, j.direction, prices[t], j.direction_confidence))
+        if t <= busy_until:
+            continue
         d = decide(j, limits, ks, cal, equity=eq, peak_equity=peak, day_start_equity=day0)
         if d["action"] != "fire":
             continue

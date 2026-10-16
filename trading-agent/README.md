@@ -1,6 +1,6 @@
 # 24/7 crypto trading agent: BRAIN / REFLEX split
 
-**Status: REFLEX layer and offline replay harness built and tested (13 tests). Paper trading only. Research layer, live data, and live execution are NOT built.**
+**Status: REFLEX layer and offline replay harness built and tested (13 tests, real-data loader, walk-forward, order-book recorder). Paper trading only. Research layer, live data, and live execution are NOT built.**
 
 ## Architecture
 - **BRAIN (slow, Opus-class):** regime research, strategy derivation, backtests, overnight review, escalations. Not implemented here; it needs live data and sources.
@@ -20,6 +20,13 @@
 | `execution.py` | Paper broker. Live path intentionally absent |
 
 Run: `python3 -m unittest discover -s tests -v`
+
+## Tools
+- `python3 tools/evaluate.py BTCUSDT|ETHUSDT`: walk-forward on Binance Public Data (hourly, 2023-2026), calibrate on fold k, test on fold k+1.
+- `python3 tools/record_books.py XBTUSD 3600 1.0`: record Kraken order-book snapshots (JSON lines in `data/`, git-ignored) for later replay.
+
+## First real-data result (honest)
+The momentum baseline (placeholder for Jev) hits only **46-51%** on 6h-ahead direction for BTC and ETH, and higher confidence does not mean higher hit rate. The calibrated gate therefore **never fires: 0 trades, 0% return** in all out-of-sample folds, versus buy&hold +190% (BTC) over the same period. That is the system working as designed: no demonstrated edge, no trading. It also shows the bar any real signal must clear. A shadow-calibration mode (every signal is scored after its horizon, traded or not) was added so the agent can build a track record without risking capital.
 
 ## Six build phases (spec -> architecture -> test-first -> review -> ship -> approval gate)
 1. **Spec:** done in this README + schema. Open: universe, venue, daily-loss limit, latency budget.
