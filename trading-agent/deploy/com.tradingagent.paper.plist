@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Install: replace /Users/YOURNAME and the key, then
+       cp deploy/com.tradingagent.paper.plist ~/Library/LaunchAgents/
+       launchctl load ~/Library/LaunchAgents/com.tradingagent.paper.plist
+     Stop: launchctl unload ~/Library/LaunchAgents/com.tradingagent.paper.plist
+     The key lives only in this local copy (never commit it). Paper trading only: no orders are sent. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.tradingagent.paper</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/caffeinate</string><string>-i</string>
+    <string>/usr/bin/python3</string>
+    <string>/Users/YOURNAME/skat-block/trading-agent/tools/run_paper.py</string>
+    <string>--jev</string><string>placeholder</string>
+    <string>--interval</string><string>300</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict><key>ANTHROPIC_API_KEY</key><string>PASTE_KEY_HERE_ONLY_FOR_--jev_claude</string></dict>
+  <key>WorkingDirectory</key><string>/Users/YOURNAME/skat-block/trading-agent</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/Users/YOURNAME/skat-block/trading-agent/data/paper.out.log</string>
+  <key>StandardErrorPath</key><string>/Users/YOURNAME/skat-block/trading-agent/data/paper.err.log</string>
+</dict>
+</plist>

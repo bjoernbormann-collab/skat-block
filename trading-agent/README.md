@@ -1,6 +1,6 @@
 # 24/7 crypto trading agent: BRAIN / REFLEX split
 
-**Status: REFLEX layer and offline replay harness built and tested (16 tests, BRAIN research v0, real-data loader, walk-forward, order-book recorder). Paper trading only. Research layer, live data, and live execution are NOT built.**
+**Status: REFLEX layer and offline replay harness built and tested (22 tests, paper loop, Jev interface, BRAIN research v0, real-data loader, walk-forward, order-book recorder). Paper trading only. Research layer, live data, and live execution are NOT built.**
 
 ## Architecture
 - **BRAIN (slow, Opus-class):** regime research, strategy derivation, backtests, overnight review, escalations. Not implemented here; it needs live data and sources.
@@ -24,6 +24,19 @@ Run: `python3 -m unittest discover -s tests -v`
 ## Tools
 - `python3 tools/evaluate.py BTCUSDT|ETHUSDT`: walk-forward on Binance Public Data (hourly, 2023-2026), calibrate on fold k, test on fold k+1.
 - `python3 tools/record_books.py XBTUSD 3600 1.0`: record Kraken order-book snapshots (JSON lines in `data/`, git-ignored) for later replay.
+
+## Paper trading on the Mac mini (`tools/run_paper.py`)
+No orders are ever sent. Live Kraken public data -> state -> Jev -> gate/risk -> simulated fills. State, calibration track record, and open position persist in `data/paper_state.json`; every decision is appended to `data/paper_log.jsonl`.
+```
+cd skat-block/trading-agent
+python3 tools/run_paper.py --jev placeholder            # plumbing test; never trades (confidence capped at 0.7)
+pip3 install anthropic                                   # only for --jev claude
+export ANTHROPIC_API_KEY=...                             # from console.anthropic.com, never commit
+python3 tools/run_paper.py --jev claude --interval 300   # Claude Haiku 5.5 as Jev, one call per tick, 300 calls/day cap
+```
+Auto-start and restart after crash/reboot: `deploy/com.tradingagent.paper.plist` (launchd; instructions in the file).
+`reflex/jev.py` holds the Jev interface: any object with `decide(state) -> dict` works, so a different model can replace Claude without touching gate, risk, or sizing. Any Jev error, refusal, or malformed output means HOLD.
+**Not yet verified:** `ClaudeJev` has unit-level syntax checks only; it has not been run against the live API (no key in the build environment). Run it once on the Mac mini and check `data/paper_log.jsonl` for `jev_error` entries.
 
 ## BRAIN v0 (`brain/`)
 - `python3 -m brain.market_report`: live regime snapshot (Kraken, CoinGecko, DefiLlama, Fear&Greed), sources and timestamps on every figure, failures shown as UNAVAILABLE. Latest: `research/market_snapshot.md`.
