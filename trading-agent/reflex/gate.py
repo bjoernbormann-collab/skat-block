@@ -6,7 +6,11 @@ from .calibration import Calibrator
 
 
 def decide(j: JevDecision, limits: RiskLimits, ks: KillSwitch, cal: Calibrator, *,
-           equity, peak_equity, day_start_equity) -> dict:
+           equity, peak_equity, day_start_equity,
+           age_ms: float = 0.0, max_age_ms: float = 1000.0) -> dict:
+    # 0. Stale snapshot: never trade on old data.
+    if age_ms > max_age_ms:
+        return {"action": "hold", "reason": "stale_snapshot"}
     # 1. Low confidence or crisis regime -> hand to the slow brain, never trade on it.
     if j.direction_confidence < limits.jev_conf_floor or j.regime == "crisis":
         return {"action": "escalate", "reason": "low_confidence_or_crisis"}

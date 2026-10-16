@@ -1,6 +1,6 @@
 # 24/7 crypto trading agent: BRAIN / REFLEX split
 
-**Status: REFLEX layer built and tested (9 tests). Paper trading only. Research layer, live data, and live execution are NOT built.**
+**Status: REFLEX layer and offline replay harness built and tested (13 tests). Paper trading only. Research layer, live data, and live execution are NOT built.**
 
 ## Architecture
 - **BRAIN (slow, Opus-class):** regime research, strategy derivation, backtests, overnight review, escalations. Not implemented here; it needs live data and sources.
@@ -16,6 +16,7 @@
 | `sizing.py` | Quarter-Kelly from calibrated p |
 | `risk.py` | 15% max drawdown, position cap, daily loss, latched kill switch (human reset) |
 | `gate.py` | fire only if: no toxic flow, setup_quality>=2, calibrated p>0.80, risk_state ok; escalate if conf<0.60 or crisis |
+| `replay.py` | Backtest harness: causal signal, real gate/risk/sizing, fees+slippage, Brier, kill switch. Tests prove a leaky oracle is caught and a causal momentum baseline has no edge on noise |
 | `execution.py` | Paper broker. Live path intentionally absent |
 
 Run: `python3 -m unittest discover -s tests -v`
@@ -23,7 +24,7 @@ Run: `python3 -m unittest discover -s tests -v`
 ## Six build phases (spec -> architecture -> test-first -> review -> ship -> approval gate)
 1. **Spec:** done in this README + schema. Open: universe, venue, daily-loss limit, latency budget.
 2. **Architecture:** adapters for exchange feed, LLM client, store. Put AgentKit/Jev behind these interfaces once their docs are verified.
-3. **Test-first:** done for REFLEX. Next: replay harness over recorded books, property tests on the risk layer.
+3. **Test-first:** done for REFLEX. Replay harness done on synthetic data. Next: recorded real books, walk-forward splits, property tests on the risk layer.
 4. **Review:** adversarial review of the gate and kill switch; add a staleness check (reject snapshots older than N ms).
 5. **Ship (paper):** run >= 4 weeks paper with fees, slippage, and latency modelled. Log every Jev output and outcome.
 6. **Approval gate:** the operator approves live only after calibration (Brier) and drawdown criteria are met, in writing, with a small capital cap.
