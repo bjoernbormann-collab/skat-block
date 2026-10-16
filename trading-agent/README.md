@@ -29,6 +29,7 @@ Run: `python3 -m unittest discover -s tests -v`
 - `python3 -m brain.market_report`: live regime snapshot (Kraken, CoinGecko, DefiLlama, Fear&Greed), sources and timestamps on every figure, failures shown as UNAVAILABLE. Latest: `research/market_snapshot.md`.
 - `python3 -m brain.evaluate_hypotheses`: five pre-registered hypotheses (params fixed, not tuned), out-of-sample, 18bp round-trip cost, PROMOTE only if >=30 trades, mean>0, t>=3 and positive in >=75% of folds.
 - **Result (BTC and ETH, 2023-2026): all five rejected** (`research/hypothesis_results.txt`). Trend long-only and vol breakout are about flat after costs; 7-day momentum L/S loses; dip-buying has too few trades to conclude anything.
+- `python3 -m brain.fundamentals`: DefiLlama revenue/TVL + CoinGecko liquidity screen (children grouped by parent protocol). Latest: `research/fundamentals_screen.md`. Coverage is thin (about 20 liquid tokens) and chain revenue looks unreliable; the report states its own data limits.
 - Not done: per-token asymmetric setups (unlocks, fees, TVL, holder concentration, catalysts). Those need sourced, dated per-token data; none are listed here because none were verified.
 
 ## First real-data result (honest)
