@@ -44,6 +44,20 @@ class T(unittest.TestCase):
         self.assertEqual(self.get("/")[0], 200); self.assertEqual(json.loads(self.get("/api/agents")[1]), ["paper"])
         self.assertEqual(self.get("/nope")[0], 404)
 
+    def test_pwa_assets_served_with_right_types(self):
+        for path, ctype in (("/manifest.webmanifest", "application/manifest+json"), ("/sw.js", "text/javascript"),
+                            ("/icon-192.png", "image/png"), ("/icon-512.png", "image/png"), ("/apple-touch-icon.png", "image/png")):
+            with urllib.request.urlopen(f"http://127.0.0.1:{self.port}{path}") as r:
+                self.assertEqual(r.status, 200); self.assertTrue(r.headers["Content-Type"].startswith(ctype), path)
+        m = json.loads(self.get("/manifest.webmanifest")[1]); self.assertEqual(m["display"], "standalone")
+
+    def test_assets_whitelist_blocks_traversal(self):
+        for bad in ("/../tools/dashboard.py", "/sw.js/../../dashboard.py", "/%2e%2e/dashboard.py", "/icon-192.png/x"):
+            self.assertNotEqual(self.get(bad)[0], 200, bad)
+
+    def test_sw_never_caches_api(self):
+        self.assertIn('startsWith("/api/")', self.get("/sw.js")[1].decode())
+
     def test_read_only(self):
         req = urllib.request.Request(f"http://127.0.0.1:{self.port}/api/status?agent=paper", data=b"x", method="POST")
         with self.assertRaises(urllib.error.HTTPError): urllib.request.urlopen(req)

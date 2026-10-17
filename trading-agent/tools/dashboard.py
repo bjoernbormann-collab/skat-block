@@ -10,7 +10,17 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT)); sys.path.insert(0, str(ROOT / "tools"))
 from evaluate_paper import evaluate  # noqa: E402
 
-STATIC = ROOT / "tools" / "dashboard_static" / "index.html"
+STATIC_DIR = ROOT / "tools" / "dashboard_static"
+STATIC = STATIC_DIR / "index.html"
+# fixed whitelist: URL path -> (file, content type). Paths from requests are never turned into file names.
+ASSETS = {
+    "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
+    "/sw.js": ("sw.js", "text/javascript"),
+    "/icon-192.png": ("icon-192.png", "image/png"),
+    "/icon-512.png": ("icon-512.png", "image/png"),
+    "/icon-maskable-512.png": ("icon-maskable-512.png", "image/png"),
+    "/apple-touch-icon.png": ("apple-touch-icon.png", "image/png"),
+}
 
 
 def agents(data_dir):
@@ -77,6 +87,9 @@ class H(BaseHTTPRequestHandler):
         u = urlparse(self.path)
         if u.path == "/":
             return self._send(200, STATIC.read_bytes(), "text/html; charset=utf-8")
+        if u.path in ASSETS:
+            fn, ctype = ASSETS[u.path]
+            return self._send(200, (STATIC_DIR / fn).read_bytes(), ctype)
         if u.path == "/api/agents":
             return self._send(200, json.dumps(agents(self.data_dir)).encode(), "application/json")
         if u.path == "/api/status":

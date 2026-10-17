@@ -2,7 +2,14 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a1a19">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Trading">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <title>Trading Agent Dashboard</title>
 <link rel="icon" href="data:,">
 <style>
@@ -11,7 +18,8 @@
 @media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){color-scheme:dark;--bg:#121211;--surface:#1a1a19;--ink:#f0efec;
  --ink2:#c3c2b7;--muted:#8d8c85;--line:#2c2c2a;--s1:#3987e5;--good:#4cc27f;--warn:#e0a338;--bad:#ee6b6a;--goodbg:#173424;--warnbg:#3a2c10;--badbg:#3d1c1c;--neutralbg:#262624}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding:16px}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;
+ padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
 .wrap{max-width:1100px;margin:0 auto}
 header{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;justify-content:space-between;margin-bottom:14px}
 h1{font-size:20px;margin:0;font-weight:650}
@@ -108,6 +116,8 @@ function render(s){
  $("trades").innerHTML=s.trades.length?`<table><tr><th>Zeit</th><th>Seite</th><th class="num">Einsatz</th><th class="num">Netto-Rendite</th><th>Ausstieg</th></tr>${s.trades.map(r=>`<tr><td>${tm(r.ts)}</td><td>${r.side==="long"?"Long":"Short"}</td><td class="num">${fmt(r.notional)}</td><td class="num ${r.net_ret>=0?"pos":"neg"}">${pct(r.net_ret)}</td><td>${r.why==="stop"?"Stop-Loss":"Zeit"}</td></tr>`).join("")}</table>`:'<div class="empty">Noch keine abgeschlossenen Trades.</div>'}
 async function tick(){try{await agents();if(!cur)return;render(await (await fetch("/api/status?agent="+encodeURIComponent(cur))).json())}catch(e){$("alive").className="chip warn";$("alive").textContent="⚠ Anzeigefehler: "+(e&&e.message||e);console.error(e)}}
 addEventListener("resize",()=>{if(lastDraw)draw(...lastDraw)});
+if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick()});   // refresh right away when the app comes to the foreground
 $("agent").onchange=e=>{cur=e.target.value;tick()};tick();setInterval(tick,5000);
 </script>
 </body>
