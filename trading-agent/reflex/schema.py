@@ -1,5 +1,5 @@
 """Typed Jev decision schema. Jev only fills this in; code decides what happens."""
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 Regime = Literal["trending", "mean_reverting", "high_vol", "crisis"]
@@ -47,6 +47,8 @@ class JevDecision:
             raise SchemaError("setup_quality 0..3")
         if not 0.0 <= x.direction_confidence <= 1.0:
             raise SchemaError("confidence range")
-        if x.reward_risk <= 0:
-            raise SchemaError("reward_risk")
+        if x.reward_risk <= 0 or x.reward_risk != x.reward_risk:      # also catches NaN
+            if x.direction != "neutral":
+                raise SchemaError("reward_risk must be > 0 for a long/short call")
+            x = replace(x, reward_risk=1.0)   # a neutral call carries no trade; any positive placeholder is fine
         return x

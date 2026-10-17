@@ -82,7 +82,7 @@ class PaperEngine:
                     f = self.broker.order(out["side"], out["notional"], mid)
                     self.pos = dict(side=out["side"], notional=out["notional"], entry=f["px"], exit_ts=now + self.horizon)
             except Exception as e:                       # Jev down / malformed / refusal -> never trade
-                out = {"action": "hold", "reason": f"jev_error:{type(e).__name__}"}
+                out = {"action": "hold", "reason": f"jev_error:{type(e).__name__}:{str(e)[:120]}"}
         out.update(ts=now, mid=mid, equity=round(self.broker.equity, 2), killed=self.ks.tripped)
         self._log(out); self._save()
         return out

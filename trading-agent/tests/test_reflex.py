@@ -52,6 +52,16 @@ class T(unittest.TestCase):
             with self.assertRaises(SchemaError): JevDecision.parse({**GOOD, **bad})
         with self.assertRaises(SchemaError): JevDecision.parse({})
 
+    def test_neutral_with_zero_reward_risk_is_valid(self):
+        # regression: Claude returns reward_risk=0 for neutral calls; that must parse, and never reach Kelly as 0
+        j = JevDecision.parse({**GOOD, "direction": "neutral", "reward_risk": 0})
+        self.assertEqual(j.reward_risk, 1.0)
+        self.assertEqual(decide(j, RiskLimits(), KillSwitch(), cal(), **EQ)["action"], "hold")
+
+    def test_directional_call_needs_positive_reward_risk(self):
+        for bad in (0, -1, float("nan")):
+            with self.assertRaises(SchemaError): JevDecision.parse({**GOOD, "reward_risk": bad})
+
     def test_kelly_quarter(self):
         self.assertAlmostEqual(kelly_fraction(0.9, 2.0), (0.9 - 0.05) * 0.25)
         self.assertEqual(kelly_fraction(0.3, 1.0), 0.0)

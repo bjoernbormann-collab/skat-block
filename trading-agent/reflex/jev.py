@@ -10,7 +10,9 @@ SYSTEM = (
     "low setup_quality unless the snapshot gives a clear, specific reason. direction_confidence is your honest "
     "probability that the direction is right over the next hour; do not inflate it. toxic_flow is true if the "
     "flow looks informed or adverse (strong one-sided flow against a thin book, spread blowout). "
-    "setup_quality: 0 none, 1 weak, 2 decent, 3 excellent. risk_state: ok, reduce, or halt."
+    "setup_quality: 0 none, 1 weak, 2 decent, 3 excellent. risk_state: ok, reduce, or halt. "
+    "reward_risk is the target-to-stop ratio of your idea as a positive number (for example 1.5); "
+    "when direction is neutral, use 1.0."
 )
 
 SCHEMA = {
