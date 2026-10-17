@@ -31,6 +31,12 @@ rm -f data/paper_state.json data/paper_log.jsonl
 sudo cp deploy/tradingagent.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now tradingagent
 journalctl -u tradingagent -f
 ```
+## Dashboard
+```
+python3 tools/dashboard.py            # nur lokal erreichbar (127.0.0.1:8000), lesend
+```
+Vom eigenen Rechner (bei Oracle): `ssh -L 8000:localhost:8000 -i <key> ubuntu@<IP>`, dann im Browser http://localhost:8000. Dauerbetrieb: `deploy/tradingagent-dashboard.service` wie den Agenten-Dienst installieren. Nie ohne Tunnel ins Internet stellen (keine Anmeldung).
+
 ## 5. Auswerten (nach >= 28 Tagen)
 `cd ~/skat-block/trading-agent && python3 tools/evaluate_paper.py`
 

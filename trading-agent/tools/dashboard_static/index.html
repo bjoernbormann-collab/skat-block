@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trading Agent Dashboard</title>
+<link rel="icon" href="data:,">
+<style>
+:root{color-scheme:light;--bg:#f6f6f4;--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#8a8984;--line:#e4e3de;
+ --s1:#2a78d6;--good:#0f7b3f;--warn:#a86600;--bad:#c4302f;--goodbg:#e3f3ea;--warnbg:#fbefd9;--badbg:#fbe4e3;--neutralbg:#ecebe6}
+@media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){color-scheme:dark;--bg:#121211;--surface:#1a1a19;--ink:#f0efec;
+ --ink2:#c3c2b7;--muted:#8d8c85;--line:#2c2c2a;--s1:#3987e5;--good:#4cc27f;--warn:#e0a338;--bad:#ee6b6a;--goodbg:#173424;--warnbg:#3a2c10;--badbg:#3d1c1c;--neutralbg:#262624}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding:16px}
+.wrap{max-width:1100px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;justify-content:space-between;margin-bottom:14px}
+h1{font-size:20px;margin:0;font-weight:650}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+select{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:inherit}
+.chip{display:inline-flex;gap:6px;align-items:center;border-radius:999px;padding:3px 10px;font-size:13px;font-weight:600;background:var(--neutralbg);color:var(--ink2);white-space:nowrap}
+.chip.good{background:var(--goodbg);color:var(--good)}.chip.warn{background:var(--warnbg);color:var(--warn)}.chip.bad{background:var(--badbg);color:var(--bad)}
+.chip.live{background:var(--badbg);color:var(--bad)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.tile,.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.tile .l{color:var(--ink2);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.tile .v{font-size:24px;font-weight:650;margin-top:2px;font-variant-numeric:tabular-nums}
+.tile .s{font-size:12px;color:var(--muted)}
+.card{margin-bottom:14px}.card h2{font-size:15px;margin:0 0 8px;font-weight:650}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:760px){.grid2{grid-template-columns:1fr}}
+#chart{position:relative}svg{display:block;width:100%;height:auto}
+.axis text{fill:var(--muted);font-size:11px}.axis line,.axis path{stroke:var(--line)}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12px;box-shadow:0 2px 8px #0003;display:none;white-space:nowrap}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th{text-align:left;color:var(--ink2);font-weight:600;border-bottom:1px solid var(--line);padding:5px 6px}
+td{border-bottom:1px solid var(--line);padding:5px 6px;vertical-align:middle}
+.tw{overflow-x:auto}.num{text-align:right}
+.hb{height:8px;background:var(--neutralbg);border-radius:4px;min-width:60px}.hb i{display:block;height:8px;background:var(--s1);border-radius:4px}
+.empty{color:var(--muted);padding:8px 0}.note{color:var(--muted);font-size:12px;margin-top:6px}
+.pos{color:var(--good)}.neg{color:var(--bad)}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <header>
+  <h1>Trading Agent</h1>
+  <div class="bar"><span id="mode" class="chip">–</span><span id="alive" class="chip">–</span><select id="agent" aria-label="Agent"></select></div>
+ </header>
+ <div id="banner"></div>
+ <div class="tiles" id="tiles"></div>
+ <div class="card"><h2>Kapitalverlauf</h2><div id="chart"><div class="tip" id="tip"></div><svg id="svg" viewBox="0 0 900 280" role="img" aria-label="Kapitalverlauf"></svg></div>
+  <div class="note">Eine Linie: Kapital in der Währung des Agenten (Start = Einsatz). Bewegen Sie die Maus für Werte.</div></div>
+ <div class="grid2">
+  <div class="card"><h2>Aktuelle Position</h2><div id="pos"></div></div>
+  <div class="card"><h2>Urteil (feste Kriterien)</h2><div id="verdict"></div></div>
+ </div>
+ <div class="card"><h2>Kalibrierung: angegebene Konfidenz gegen tatsächliche Trefferquote</h2><div class="tw" id="cal"></div></div>
+ <div class="card"><h2>Letzte Entscheidungen</h2><div class="tw" id="recent"></div></div>
+ <div class="card"><h2>Abgeschlossene Trades</h2><div class="tw" id="trades"></div></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const fmt=(n,d=2)=>n==null||isNaN(n)?"–":Number(n).toLocaleString("de-DE",{minimumFractionDigits:d,maximumFractionDigits:d});
+const pct=(n,d=2)=>n==null||isNaN(n)?"–":(n>=0?"+":"")+fmt(n*100,d)+" %";
+const rate=(n,d=1)=>n==null||isNaN(n)?"–":fmt(n*100,d)+" %";
+const REASON={gate:"Bedingungen nicht erfüllt (Konfidenz, Qualität oder Fluss)",in_position:"Position offen",stale_snapshot:"Marktdaten zu alt",low_confidence_or_crisis:"Unsicher oder Krise: Eskalation",
+ crisis_regime:"Krisen-Regime",position_cap:"Positionsgrenze",max_drawdown:"Drawdown-Grenze erreicht",daily_loss:"Tagesverlust-Grenze erreicht",no_edge:"Kein Vorteil berechnet",long_only:"Nur Long erlaubt"};
+const reason=r=>{const x=String(r||"");if(REASON[x])return REASON[x];if(x.startsWith("jev_error"))return "Jev-Fehler ("+x.split(":")[1]+")";if(x.startsWith("kill_switch"))return "Notaus aktiv";if(x.startsWith("order_skipped"))return "Order ausgelassen ("+x.split(":").slice(1).join(":")+")";return x};
+const WHY={"NOT ENOUGH DATA":"Es braucht mindestens 28 Tage und 100 abgeschlossene Trades, bevor ein Urteil möglich ist."};
+const tm=t=>new Date(t*1000).toLocaleString("de-DE",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"});
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const ICON={fire:"▲ Kauf",hold:"■ Halten",escalate:"◆ Eskalation"};
+let cur=null;
+async function agents(){const a=await (await fetch("/api/agents")).json();const s=$("agent");
+ if(!a.length){$("banner").innerHTML='<div class="card"><b>Noch keine Daten.</b> Starten Sie zuerst <code>tools/run_paper.py</code>; sobald <code>data/paper_log.jsonl</code> existiert, erscheint der Agent hier.</div>';return}
+ if(s.options.length!==a.length){s.innerHTML=a.map(x=>`<option>${esc(x)}</option>`).join("")}
+ if(!cur||!a.includes(cur))cur=a[0];s.value=cur}
+let lastDraw=null;
+function draw(eq,start){lastDraw=[eq,start];const svg=$("svg"),W=Math.max(300,$("chart").clientWidth||900),H=W<500?230:280,N=W<500?2:4,m={l:W<500?52:64,r:14,t:10,b:26};svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+ if(eq.length<2){svg.innerHTML='<text x="20" y="40" fill="var(--muted)">Noch zu wenig Datenpunkte.</text>';return}
+ const xs=eq.map(p=>p[0]),ys=eq.map(p=>p[1]);let lo=Math.min(...ys,start),hi=Math.max(...ys,start);if(hi-lo<1e-9){lo-=1;hi+=1}const pad=(hi-lo)*.08;lo-=pad;hi+=pad;
+ const x0=xs[0],x1=xs[xs.length-1]||x0+1,X=t=>m.l+(t-x0)/(x1-x0||1)*(W-m.l-m.r),Y=v=>H-m.b-(v-lo)/(hi-lo)*(H-m.t-m.b);
+ const dec=Math.max(2,Math.min(6,Math.ceil(-Math.log10((hi-lo)/4))+1));
+ let g="";for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4,y=Y(v);g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${m.l-8}" y="${y+4}" text-anchor="end" fill="var(--muted)" font-size="11">${fmt(v,dec)}</text>`}
+ for(let i=0;i<=N;i++){const t=x0+(x1-x0)*i/N,an=i===0?"start":i===N?"end":"middle";g+=`<text x="${X(t)}" y="${H-6}" text-anchor="${an}" fill="var(--muted)" font-size="11">${new Date(t*1000).toLocaleString("de-DE",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</text>`}
+ const d=eq.map((p,i)=>(i?"L":"M")+X(p[0]).toFixed(1)+" "+Y(p[1]).toFixed(1)).join(" ");
+ g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(start)}" y2="${Y(start)}" stroke="var(--muted)" stroke-dasharray="4 4"/><text x="${W-m.r}" y="${Y(start)-5}" text-anchor="end" fill="var(--muted)" font-size="11">Start ${fmt(start)}</text>`;
+ g+=`<path d="${d}" fill="none" stroke="var(--s1)" stroke-width="2" stroke-linejoin="round"/><line id="cx" y1="${m.t}" y2="${H-m.b}" stroke="var(--muted)" style="display:none"/><circle id="cd" r="4" fill="var(--s1)" stroke="var(--surface)" stroke-width="2" style="display:none"/><rect id="hit" x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${H-m.t-m.b}" fill="transparent"/>`;
+ svg.innerHTML=g;const hit=$("hit"),tip=$("tip");
+ const move=e=>{const r=svg.getBoundingClientRect(),px=((e.clientX-r.left)/r.width*W);let best=0,bd=1e9;eq.forEach((p,i)=>{const dx=Math.abs(X(p[0])-px);if(dx<bd){bd=dx;best=i}});
+  const p=eq[best],cx=X(p[0]),cy=Y(p[1]);$("cx").setAttribute("x1",cx);$("cx").setAttribute("x2",cx);$("cx").style.display="";$("cd").setAttribute("cx",cx);$("cd").setAttribute("cy",cy);$("cd").style.display="";
+  tip.style.display="block";tip.innerHTML=`<b>${fmt(p[1])}</b><br>${tm(p[0])}`;const tx=cx/W*r.width,ty=cy/H*r.height;tip.style.left=Math.min(r.width-130,Math.max(0,tx+10))+"px";tip.style.top=Math.max(0,ty-44)+"px"};
+ hit.onmousemove=move;hit.onmouseleave=()=>{tip.style.display="none";$("cx").style.display="none";$("cd").style.display="none"}}
+function render(s){
+ $("mode").textContent=s.mode==="LIVE"?"● LIVE (echtes Geld)":"PAPER (simuliert)";$("mode").className="chip "+(s.mode==="LIVE"?"live":"");
+ const stale=s.age_s==null||s.age_s>900;$("alive").className="chip "+(stale?"warn":"good");
+ $("alive").textContent=s.age_s==null?"⚠ keine Daten":stale?`⚠ letzte Aktivität vor ${Math.round(s.age_s/60)} Min`:`✓ aktiv (letzter Tick vor ${Math.round(s.age_s)} s)`;
+ const m=s.metrics||{},eq=s.equity,last=eq.length?eq[eq.length-1][1]:null,ret=s.start_equity?last/s.start_equity-1:null;
+ $("banner").innerHTML=s.killed?`<div class="card" style="border-color:var(--bad)"><span class="chip bad">✕ NOTAUS aktiv</span> Grund: <b>${esc(s.kill_reason||"unbekannt")}</b>. Der Agent handelt nicht mehr, bis ein Mensch den Notaus zurücksetzt.</div>`:"";
+ $("tiles").innerHTML=[["Kapital",fmt(last),`Start ${fmt(s.start_equity)}`],["Rendite",pct(ret),""],["Max. Drawdown",pct(-(m.max_drawdown||0)),"Grenze 15 %"],
+  ["Trades",m.trades??0,`Käufe ${m.fires??0} · Eskalationen ${m.escalations??0}`],["Bewertete Signale",m.signals??0,`Trefferquote ${m.hit!=null&&!isNaN(m.hit)?fmt(m.hit*100,1)+" %":"–"}`],
+  ["Jev-Fehler",rate(m.jev_error_rate??0,1),"Limit 5 %"]].map(([l,v,sub])=>`<div class="tile"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`).join("");
+ draw(eq,s.start_equity);
+ const p=s.position;$("pos").innerHTML=p?`<table><tr><td>Seite</td><td class="num">${p.side==="long"?"Long (gekauft)":"Short"}</td></tr><tr><td>Einsatz</td><td class="num">${fmt(p.notional)}</td></tr><tr><td>Einstieg</td><td class="num">${fmt(p.entry)}</td></tr><tr><td>Zeitausstieg</td><td class="num">${tm(p.exit_ts)}</td></tr></table>`:'<div class="empty">Keine offene Position. Der Agent wartet auf ein Signal, das alle Bedingungen erfüllt.</div>';
+ const v=m.verdict;if(v){const c=v==="CANDIDATE"?"good":v==="STOP"?"bad":"";const t={"CANDIDATE":"✓ Kandidat","STOP":"✕ Stopp","NOT ENOUGH DATA":"… Zu wenig Daten"}[v]||v;
+  $("verdict").innerHTML=`<span class="chip ${c}">${t}</span><p style="margin:8px 0 0;color:var(--ink2)">${esc(WHY[v]||m.why)}</p><div class="note">Bisher ${fmt(m.days,1)} Tage · ${m.trades} Trades. Mindestens 28 Tage und 100 Trades nötig. Ein Kandidat ist keine Garantie.</div>`}else $("verdict").innerHTML='<div class="empty">–</div>';
+ const b=m.bins||{},ks=Object.keys(b);$("cal").innerHTML=ks.length?`<table><tr><th>Konfidenz</th><th class="num">Signale</th><th>Trefferquote</th><th class="num">%</th></tr>${ks.map(k=>{const [n,h]=b[k];return `<tr><td>${fmt(+k,1)}–${fmt(+k+.1,1)}</td><td class="num">${n}</td><td><div class="hb"><i style="width:${(h*100).toFixed(0)}%"></i></div></td><td class="num">${fmt(h*100,1)}</td></tr>`}).join("")}</table><div class="note">Ein gut kalibrierter Agent trifft in Zeile 0,9–1,0 etwa 90 %. Brier ${m.brier!=null&&!isNaN(m.brier)?fmt(m.brier,3):"–"} (0,250 = Münzwurf).</div>`:'<div class="empty">Noch keine ausgewerteten Signale (sie werden nach der Haltedauer bewertet).</div>';
+ $("recent").innerHTML=s.recent.length?`<table><tr><th>Zeit</th><th>Aktion</th><th>Grund</th><th class="num">Kurs</th><th class="num">Kapital</th></tr>${s.recent.map(r=>`<tr><td>${tm(r.ts)}</td><td>${ICON[r.action]||esc(r.action)}</td><td>${esc(r.action==="fire"?(r.side==="long"?"Long ":"Short ")+fmt(r.notional)+" (p="+fmt(r.p_cal,2)+")":reason(r.reason))}</td><td class="num">${fmt(r.mid)}</td><td class="num">${fmt(r.equity)}</td></tr>`).join("")}</table>`:'<div class="empty">–</div>';
+ $("trades").innerHTML=s.trades.length?`<table><tr><th>Zeit</th><th>Seite</th><th class="num">Einsatz</th><th class="num">Netto-Rendite</th><th>Ausstieg</th></tr>${s.trades.map(r=>`<tr><td>${tm(r.ts)}</td><td>${r.side==="long"?"Long":"Short"}</td><td class="num">${fmt(r.notional)}</td><td class="num ${r.net_ret>=0?"pos":"neg"}">${pct(r.net_ret)}</td><td>${r.why==="stop"?"Stop-Loss":"Zeit"}</td></tr>`).join("")}</table>`:'<div class="empty">Noch keine abgeschlossenen Trades.</div>'}
+async function tick(){try{await agents();if(!cur)return;render(await (await fetch("/api/status?agent="+encodeURIComponent(cur))).json())}catch(e){$("alive").className="chip warn";$("alive").textContent="⚠ Dashboard-Server nicht erreichbar"}}
+addEventListener("resize",()=>{if(lastDraw)draw(...lastDraw)});
+$("agent").onchange=e=>{cur=e.target.value;tick()};tick();setInterval(tick,5000);
+</script>
+</body>
+</html>

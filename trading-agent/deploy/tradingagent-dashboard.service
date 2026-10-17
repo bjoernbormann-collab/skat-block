@@ -1,0 +1,16 @@
+# Dashboard as a service (read-only, bound to 127.0.0.1 only). Install like tradingagent.service.
+# Access from your own computer:  ssh -L 8000:localhost:8000 ubuntu@<server-ip>   then open http://localhost:8000
+[Unit]
+Description=Trading agent dashboard (read-only)
+After=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/skat-block/trading-agent
+ExecStart=/usr/bin/python3 tools/dashboard.py --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

@@ -42,6 +42,12 @@ Zeigt nach mindestens 28 Tagen und 100 abgeschlossenen Trades ein Urteil nach vo
 - **STOP**: ein Kriterium ist durchgefallen (kein Edge, zu viel Drawdown, zu viele Jev-Fehler, Notaus). Nicht live gehen.
 - **CANDIDATE**: alle Kriterien erfüllt. Das ist kein Freibrief, sondern nur die Berechtigung, über einen Start mit sehr kleinem Kapital nachzudenken.
 
+## Dashboard
+```
+python3 tools/dashboard.py            # nur lokal erreichbar (127.0.0.1:8000), lesend
+```
+Vom eigenen Rechner (bei Oracle): `ssh -L 8000:localhost:8000 -i <key> ubuntu@<IP>`, dann im Browser http://localhost:8000. Dauerbetrieb: `deploy/tradingagent-dashboard.service` wie den Agenten-Dienst installieren. Nie ohne Tunnel ins Internet stellen (keine Anmeldung).
+
 ## 6. Orderbuch-Recorder (optional, für spätere Backtests)
 `caffeinate -i python3 tools/record_books.py XBTUSD 86400 1.0`
 

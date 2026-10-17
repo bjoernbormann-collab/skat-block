@@ -38,6 +38,9 @@ Auto-start and restart after crash/reboot: `deploy/com.tradingagent.paper.plist`
 `reflex/jev.py` holds the Jev interface: any object with `decide(state) -> dict` works, so a different model can replace Claude without touching gate, risk, or sizing. Any Jev error, refusal, or malformed output means HOLD.
 **Not yet verified:** `ClaudeJev` has unit-level syntax checks only; it has not been run against the live API (no key in the build environment). Run it once on the Mac mini and check `data/paper_log.jsonl` for `jev_error` entries.
 
+## Live dashboard (`tools/dashboard.py`)
+Read-only web page over the agents' logs (every `data/*_log.jsonl` is an agent; `live_*` is marked LIVE): capital curve with hover, KPIs, open position, kill-switch banner, go/no-go verdict, calibration, recent decisions and trades, auto-refresh every 5 s, light/dark/phone layout. Binds to 127.0.0.1 only; no authentication, so reach it through an SSH tunnel (`ssh -L 8000:localhost:8000 user@server`, then http://localhost:8000). Service file: `deploy/tradingagent-dashboard.service`. It never writes or places orders.
+
 ## Go/no-go evaluation (`tools/evaluate_paper.py`)
 Reads the paper log and applies criteria fixed in advance: >= 28 days, >= 100 closed trades, mean net return per trade > 0, t >= 2, max drawdown <= 10%, Jev error rate <= 5%, Brier < 0.25 (coin flip), kill switch never tripped. Verdicts: NOT ENOUGH DATA / STOP / CANDIDATE. Setup guides: `SETUP_MAC_MINI.md` (launchd) or `SETUP_ORACLE.md` (Linux server, systemd unit in `deploy/tradingagent.service`). Run only one instance.
 
