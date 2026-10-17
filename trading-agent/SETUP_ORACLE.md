@@ -5,6 +5,21 @@ Paper-Trading, es werden keine echten Orders gesendet. **Nur eine Instanz betrei
 ## 0. Wichtig: Oracle kann ungenutzte Always-Free-Instanzen einziehen
 Nach Oracles Bedingungen (aus dem Gedächtnis, bitte aktuell prüfen) werden Always-Free-Instanzen als "idle" gestoppt/zurückgefordert, wenn über 7 Tage CPU, Netzwerk und Speicher dauerhaft sehr niedrig sind (unter ca. 20 %). Dieser Agent ist fast immer im Leerlauf. Gegenmittel: das Konto auf **Pay As You Go** hochstufen. Solange du nur Always-Free-Ressourcen nutzt, kostet das nichts, und die Idle-Rückforderung betrifft dich dann nach Oracles Angaben nicht. Das ist deine Entscheidung (Kreditkarte nötig); prüfe vorher die aktuellen Oracle-Bedingungen.
 
+## Schnellweg (empfohlen): alles automatisch beim Erstellen der Instanz
+In der Oracle-Konsole: Compute -> Instances -> Create instance -> **Show advanced options** -> Reiter **Management** -> **Cloud-init script** -> *Paste cloud-init script* und den Inhalt von `deploy/oracle-cloud-init.sh` einfügen
+(Rohtext: https://raw.githubusercontent.com/bjoernbormann-collab/skat-block/claude/new-session-1od9nf/trading-agent/deploy/oracle-cloud-init.sh).
+Beim ersten Start installiert der Server selbst: Pakete, Code, Tests, den Agenten (Paper, Platzhalter-Jev, kostet nichts, handelt nie) und das Dashboard, beides als Dienste mit Autostart.
+Danach per SSH:
+```
+cat /var/log/tradingagent-tests.log | tail -3        # erwartet: TESTS OK
+tail -3 /var/log/tradingagent-setup.log               # erwartet: SETUP DONE
+sudo bash ~/skat-block/trading-agent/deploy/enable_claude.sh   # fragt den Anthropic-Schlüssel versteckt ab, testet EINEN Aufruf, schaltet erst dann auf Claude
+journalctl -u tradingagent -f
+```
+Das Skript braucht, dass das GitHub-Repo ohne Anmeldung klonbar ist (öffentlich). Steht im Setup-Log `CLONE FAILED`, ist es privat: dann klonen mit Zugangstoken oder den manuellen Weg unten nehmen.
+Dashboard: `ssh -L 8000:localhost:8000 -i <key> ubuntu@<IP>` und `http://localhost:8000` öffnen.
+
+## Manueller Weg
 ## 1. Instanz
 Region Frankfurt (oder nah). Image Ubuntu 22.04/24.04. Shape: VM.Standard.A1.Flex (1 OCPU / 6 GB reicht) oder VM.Standard.E2.1.Micro. SSH-Key hinterlegen, nur Port 22 offen lassen (eingehend nichts weiter nötig, der Agent ruft nur nach außen).
 
