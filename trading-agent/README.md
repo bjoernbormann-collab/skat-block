@@ -39,7 +39,7 @@ Auto-start and restart after crash/reboot: `deploy/com.tradingagent.paper.plist`
 **Not yet verified:** `ClaudeJev` has unit-level syntax checks only; it has not been run against the live API (no key in the build environment). Run it once on the Mac mini and check `data/paper_log.jsonl` for `jev_error` entries.
 
 ## Go/no-go evaluation (`tools/evaluate_paper.py`)
-Reads the paper log and applies criteria fixed in advance: >= 28 days, >= 100 closed trades, mean net return per trade > 0, t >= 2, max drawdown <= 10%, Jev error rate <= 5%, Brier < 0.25 (coin flip), kill switch never tripped. Verdicts: NOT ENOUGH DATA / STOP / CANDIDATE. Full setup guide: `SETUP_MAC_MINI.md`.
+Reads the paper log and applies criteria fixed in advance: >= 28 days, >= 100 closed trades, mean net return per trade > 0, t >= 2, max drawdown <= 10%, Jev error rate <= 5%, Brier < 0.25 (coin flip), kill switch never tripped. Verdicts: NOT ENOUGH DATA / STOP / CANDIDATE. Setup guides: `SETUP_MAC_MINI.md` (launchd) or `SETUP_ORACLE.md` (Linux server, systemd unit in `deploy/tradingagent.service`). Run only one instance.
 
 ## Deliberately NOT built: live order execution
 There is no code path that sends a real order. Adding one belongs after a CANDIDATE verdict, behind an explicit operator approval flag, with withdrawal-restricted keys and a tiny capital cap.

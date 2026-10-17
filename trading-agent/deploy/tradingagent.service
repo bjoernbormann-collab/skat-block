@@ -1,0 +1,21 @@
+# systemd unit for a Linux server (Oracle Cloud, Ubuntu). Paper trading only: no orders are sent.
+# Install:  sudo cp deploy/tradingagent.service /etc/systemd/system/
+#           sudo systemctl daemon-reload && sudo systemctl enable --now tradingagent
+# Logs:     journalctl -u tradingagent -f        Stop: sudo systemctl stop tradingagent
+# Edit User and paths below if yours differ. The API key lives only in /etc/tradingagent.env (chmod 600).
+[Unit]
+Description=Trading agent (paper)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/skat-block/trading-agent
+EnvironmentFile=/etc/tradingagent.env
+ExecStart=/usr/bin/python3 tools/run_paper.py --jev claude --interval 300
+Restart=always
+RestartSec=20
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
