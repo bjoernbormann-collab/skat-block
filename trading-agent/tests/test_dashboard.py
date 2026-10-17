@@ -31,6 +31,11 @@ class T(unittest.TestCase):
         self.assertEqual(c, 200); self.assertEqual(d["mode"], "PAPER"); self.assertTrue(d["killed"])
         self.assertEqual(d["kill_reason"], "max_drawdown"); self.assertEqual(len(d["equity"]), 10); self.assertEqual(len(d["trades"]), 1)
 
+    def test_fresh_agent_without_scored_signals_is_valid_json(self):
+        # regression: brier/hit are NaN until the first signal is scored; NaN is invalid JSON in browsers
+        c, b = self.get("/api/status?agent=paper"); txt = b.decode()
+        self.assertNotIn("NaN", txt); json.loads(txt, parse_constant=lambda x: self.fail("non-finite constant " + x))
+
     def test_agent_whitelist_blocks_paths(self):
         for bad in ("../etc/passwd", "paper_log", "%2e%2e/x", ""):
             self.assertEqual(self.get("/api/status?agent=" + bad)[0], 404)

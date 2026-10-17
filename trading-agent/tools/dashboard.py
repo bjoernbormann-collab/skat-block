@@ -28,6 +28,17 @@ def rows_of(path, max_bytes=20_000_000):
     return out
 
 
+def clean(x):
+    """JSON has no NaN/Infinity: browsers reject it. Replace non-finite floats with null (None)."""
+    if isinstance(x, float):
+        return x if x == x and x not in (float("inf"), float("-inf")) else None
+    if isinstance(x, dict):
+        return {k: clean(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [clean(v) for v in x]
+    return x
+
+
 def thin(pts, n=600):
     return pts if len(pts) <= n else [pts[int(i * (len(pts) - 1) / (n - 1))] for i in range(n)]
 
@@ -73,7 +84,7 @@ class H(BaseHTTPRequestHandler):
             if name not in agents(self.data_dir):                   # whitelist: never build paths from user input
                 return self._send(404, b'{"error":"unknown agent"}', "application/json")
             try:
-                return self._send(200, json.dumps(status(self.data_dir, name), default=str).encode(), "application/json")
+                return self._send(200, json.dumps(clean(status(self.data_dir, name)), default=str, allow_nan=False).encode(), "application/json")
             except Exception as e:
                 return self._send(500, json.dumps({"error": str(e)}).encode(), "application/json")
         self._send(404, b"not found", "text/plain")
